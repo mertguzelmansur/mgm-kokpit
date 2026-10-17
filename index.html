@@ -1,0 +1,3865 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0e13">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
+<title>MGM Sürüş Kokpiti</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=Jost:wght@300;400;500&family=Saira:wght@500;600;700&family=Exo+2:wght@300;400;500&family=Rajdhani:wght@500;600;700&family=Chakra+Petch:wght@500;600;700&family=Orbitron:wght@500;700;900&family=Oswald:wght@400;500;600&display=swap">
+<style>
+/* Yerlesim: ust durum cubugu + sekmeler; kokpit tek ekran (sol paneller | devir yayi + hiz | sag paneller),
+   teshis/kodlar/canli veri kaydirilan listeler. Tek, bilincli koyu gorunum (gece surusu). */
+:root {
+  --bg: #0a0e13;          /* gece kabini: mavi egilimli siyah */
+  --panel: #111821;
+  --panel2: #172130;
+  --line: #233041;
+  --fg: #e4ebf3;
+  --muted: #8796a9;
+  --dim: #56657a;
+  --accent: #5cc8ff;      /* gosterge arka isigi */
+  --ok: #3ccf8e;
+  --warn: #f3b33d;
+  --crit: #f2545b;
+  --info: #8aa2ff;
+  --f-num: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --f-ui: "Barlow", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+#errBar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; background: #5a1015; color: #fff; font: 13px/1.4 ui-monospace, Menlo, monospace; padding: 8px max(12px, env(safe-area-inset-right, 0px)) calc(8px + env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px)); white-space: pre-wrap; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.45 var(--f-ui);
+  -webkit-tap-highlight-color: transparent;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); pointer-events: none; }
+button, select, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.app { display: flex; flex-direction: column; min-height: 100%; }
+.wrap { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+/* ---- ust cubuk ---- */
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); }
+.top-in { display: flex; align-items: center; gap: 12px; padding-block: 10px; flex-wrap: wrap; }
+.brand { font: 600 19px/1 var(--f-num); letter-spacing: .06em; text-transform: uppercase; }
+.brand b { color: var(--accent); font-weight: 700; }
+.spacer { flex: 1; }
+.pill { display: inline-flex; align-items: center; gap: 7px; padding: 5px 11px; border-radius: 999px; background: var(--panel2); font-size: 13px; color: var(--muted); white-space: nowrap; }
+.pill i { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); }
+.pill.on i { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+.pill.demo i { background: var(--info); }
+.pill.busy i { background: var(--warn); animation: blink 1s infinite; }
+@keyframes blink { 50% { opacity: .3; } }
+.btn { border: 1px solid var(--line); background: var(--panel2); padding: 7px 14px; border-radius: 8px; font-weight: 600; font-size: 14px; }
+.btn.pri { background: var(--accent); color: #04121c; border-color: transparent; }
+.btn.danger { border-color: var(--crit); color: var(--crit); background: transparent; }
+.btn:disabled { opacity: .45; cursor: default; }
+.tabs { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; padding-bottom: 8px; }
+.tab { border: 0; background: transparent; color: var(--muted); padding: 7px 12px; border-radius: 8px; font-weight: 600; white-space: nowrap; position: relative; }
+.tab[aria-selected="true"] { color: var(--fg); background: var(--panel2); }
+.tab .n { display: inline-block; min-width: 18px; padding: 0 5px; margin-left: 6px; border-radius: 9px; background: var(--warn); color: #1b1200; font-size: 12px; line-height: 18px; text-align: center; }
+.tab .n.c { background: var(--crit); color: #fff; }
+.tab .n[hidden] { display: none; }
+
+main { flex: 1; padding-block: 14px 28px; }
+.view[hidden] { display: none !important; }
+.note { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; color: var(--muted); font-size: 14px; display: flex; gap: 10px; align-items: flex-start; flex-wrap: wrap; }
+.note strong { color: var(--fg); }
+
+/* ---- kokpit ---- */
+.cockpit { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(280px, 2.1fr) minmax(150px, 1fr); gap: 14px; align-items: stretch; margin-top: 12px; }
+.side { display: grid; gap: 10px; align-content: start; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; min-width: 0; }
+.lbl { font-size: 11.5px; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); display: flex; justify-content: space-between; gap: 6px; }
+.val { font: 600 30px/1.05 var(--f-num); font-variant-numeric: tabular-nums; margin-top: 2px; }
+.val small { font: 500 14px var(--f-ui); color: var(--muted); margin-left: 3px; }
+.bar { height: 6px; border-radius: 3px; background: var(--panel2); margin-top: 8px; position: relative; overflow: visible; }
+.bar > span { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; background: var(--accent); transition: width .3s; }
+.bar > em { position: absolute; top: -3px; width: 2px; height: 12px; background: var(--fg); opacity: .55; }
+.dial { position: relative; background: radial-gradient(ellipse at 50% 55%, var(--panel2) 0%, var(--bg) 70%); border-radius: 18px; border: 1px solid var(--line); min-height: 300px; display: grid; place-items: center; overflow: hidden; }
+.dial canvas { width: 100%; height: 100%; position: absolute; inset: 0; }
+.dial-c { position: relative; text-align: center; pointer-events: none; padding-top: 6%; }
+.speed { font: 700 clamp(64px, 11vw, 124px)/0.9 var(--f-num); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.unit { font-size: 13px; letter-spacing: .14em; color: var(--muted); text-transform: uppercase; }
+.rpmtxt { font: 600 20px var(--f-num); color: var(--accent); margin-top: 8px; font-variant-numeric: tabular-nums; }
+.subrow { display: flex; gap: 18px; justify-content: center; margin-top: 10px; font: 500 15px var(--f-num); color: var(--muted); font-variant-numeric: tabular-nums; }
+.subrow b { color: var(--fg); font-weight: 600; font-size: 18px; }
+.lamps { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-top: 12px; }
+.lamp { width: 34px; height: 30px; border-radius: 7px; display: grid; place-items: center; color: var(--dim); background: var(--panel); border: 1px solid var(--line); }
+.lamp svg { width: 20px; height: 20px; }
+.lamp.w { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 50%, transparent); }
+.lamp.c { color: var(--crit); border-color: color-mix(in srgb, var(--crit) 60%, transparent); animation: blink 1.2s infinite; }
+.lamp.i { color: var(--info); }
+.health-chip { display: flex; align-items: center; gap: 12px; margin-top: 12px; padding: 10px 12px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); width: 100%; text-align: left; }
+.health-chip .sc { font: 700 30px/1 var(--f-num); }
+.health-chip .t { font-size: 13px; color: var(--muted); }
+.health-chip .t b { color: var(--fg); display: block; font-size: 15px; }
+.themebar { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.th-chip { border: 1px solid var(--line); background: var(--panel); color: var(--muted); padding: 6px 13px; border-radius: 999px; font-weight: 600; font-size: 13.5px; }
+.th-chip[aria-pressed="true"] { color: var(--bg); background: var(--fg); border-color: var(--fg); }
+.cluster { position: relative; margin-top: 12px; width: 100%; max-width: 100%; aspect-ratio: 2.35 / 1; max-height: 72vh; border-radius: 18px; overflow: hidden; background: #000; border: 1px solid var(--line); }
+.cluster canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.focus-hint { display: none; }
+.kfoot { display: flex; gap: 12px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+.kfoot .lamps { margin-top: 0; justify-content: flex-start; }
+.kfoot .health-chip { margin-top: 0; flex: 1; min-width: 240px; }
+body.focus .top, body.focus .themebar, body.focus .kfoot, body.focus .tripbar, body.focus #btNote { display: none !important; }
+body.focus .cluster { position: fixed; inset: 0; aspect-ratio: auto; max-height: none; border-radius: 0; border: 0; margin: 0; z-index: 20; }
+body.focus .focus-hint { display: block; position: absolute; right: max(12px, env(safe-area-inset-right, 0px)); bottom: max(10px, env(safe-area-inset-bottom, 0px)); font-size: 12px; color: rgba(255,255,255,.35); animation: fadeOut 4s forwards; }
+@keyframes fadeOut { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
+.tripbar { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+
+/* ---- teshis ---- */
+.diag-top { display: grid; grid-template-columns: 220px 1fr; gap: 16px; align-items: start; }
+.score { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; text-align: center; }
+.score canvas { width: 160px; height: 160px; }
+.score h3, h2 { margin: 0; font: 600 20px var(--f-num); letter-spacing: .03em; text-wrap: balance; }
+.score p { margin: 6px 0 0; color: var(--muted); font-size: 13.5px; }
+.systems { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.sys { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: grid; gap: 6px; }
+.sys .h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-weight: 600; }
+.sys .h span { font: 600 20px var(--f-num); font-variant-numeric: tabular-nums; }
+.sys .s { font-size: 13px; color: var(--muted); }
+.chip { display: inline-block; font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+.chip.ok { background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); }
+.chip.info { background: color-mix(in srgb, var(--info) 18%, transparent); color: var(--info); }
+.chip.warn { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
+.chip.crit { background: color-mix(in srgb, var(--crit) 20%, transparent); color: var(--crit); }
+.chip.na { background: var(--panel2); color: var(--dim); }
+.sec-h { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 22px 0 10px; flex-wrap: wrap; }
+.sec-h p { margin: 0; color: var(--muted); font-size: 13.5px; }
+.finds { display: grid; gap: 10px; }
+.find { background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--info); border-radius: 12px; padding: 12px 14px; display: grid; gap: 8px; }
+.find.warn { border-left-color: var(--warn); } .find.crit { border-left-color: var(--crit); } .find.info { border-left-color: var(--info); }
+.find .fh { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.find .fh b { font-size: 16px; flex: 1; min-width: 200px; }
+.find .ev { font: 500 14px var(--f-num); color: var(--accent); font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+.find .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.find h4 { margin: 0 0 4px; font-size: 11.5px; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.find ul { margin: 0; padding-left: 18px; font-size: 14px; }
+.find li { margin: 2px 0; }
+.find .when { font-size: 13px; color: var(--muted); }
+.find .when b { color: var(--fg); }
+.empty { padding: 18px; text-align: center; color: var(--muted); background: var(--panel); border: 1px dashed var(--line); border-radius: 12px; }
+.learn { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+.learn canvas { width: 100%; height: 46px; display: block; margin-top: 6px; }
+
+/* ---- kodlar ---- */
+.dtc-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.confirm { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 10px 12px; background: color-mix(in srgb, var(--crit) 10%, var(--panel)); border: 1px solid var(--crit); border-radius: 10px; margin-top: 10px; font-size: 14px; }
+.dtc { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: grid; gap: 6px; }
+.dtc .code { font: 700 22px var(--f-num); letter-spacing: .04em; }
+.dtc .fh { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+
+/* ---- yeni bolumler ---- */
+.hint { color: var(--muted); font-size: 13px; }
+.tbl { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+tr:last-child td { border-bottom: 0; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.mchart { width: 100%; height: 150px; display: block; margin-top: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+.csvta { width: 100%; height: 140px; margin-top: 10px; background: #060a0e; color: var(--muted); border: 1px solid var(--line); border-radius: 10px; font: 12px ui-monospace, Menlo, monospace; }
+.perf-live { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; flex-wrap: wrap; }
+.perf-big { font: 700 64px/1 var(--f-num); font-variant-numeric: tabular-nums; margin-top: 4px; }
+.perf-big small { font: 500 18px var(--f-ui); color: var(--muted); margin-left: 6px; }
+.perf-msg { color: var(--accent); margin-top: 6px; font-size: 14px; }
+.ready-v { display: grid; gap: 4px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); border-left: 4px solid var(--ok); }
+.ready-v.warn { border-left-color: var(--warn); } .ready-v.crit { border-left-color: var(--crit); }
+.ready-v b { font-size: 16px; } .ready-v span { color: var(--muted); font-size: 14px; }
+.ready-l { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; margin-top: 10px; }
+.ready-i { display: flex; gap: 10px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; font-size: 14px; }
+.mnts { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; margin-top: 12px; }
+.mnt { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: grid; gap: 8px; }
+.mnt .mh { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.mnt .ms { color: var(--muted); font-size: 13.5px; }
+.mnt .mf { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end; }
+.mnt label { display: grid; gap: 3px; font-size: 12px; color: var(--muted); flex: 1; min-width: 110px; }
+.mnt input { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; width: 100%; }
+/* ---- canli veri ---- */
+.live { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
+.live canvas { width: 100%; height: 34px; display: block; margin-top: 6px; }
+.live .val { font-size: 26px; }
+
+/* ---- ayarlar ---- */
+.form { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.field { display: grid; gap: 5px; }
+.field label { font-size: 13px; color: var(--muted); }
+.field input, .field select { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; width: 100%; }
+.check { display: flex; gap: 10px; align-items: center; padding: 8px 0; font-size: 14.5px; }
+.check input { width: 18px; height: 18px; accent-color: var(--accent); }
+.log { background: #060a0e; border: 1px solid var(--line); border-radius: 10px; padding: 10px; font: 12.5px/1.45 ui-monospace, Menlo, Consolas, monospace; color: var(--muted); max-height: 220px; overflow: auto; white-space: pre-wrap; word-break: break-all; }
+
+@media (max-width: 860px) {
+  .cockpit { grid-template-columns: 1fr 1fr; }
+  .center { grid-column: 1 / -1; order: -1; }
+  .dial { min-height: 280px; }
+  .diag-top { grid-template-columns: 1fr; }
+  .tripbar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) { .cluster { aspect-ratio: 3 / 4.3; max-height: none; } body.focus .cluster { aspect-ratio: auto; } }
+@supports not (aspect-ratio: 1 / 1) { .cluster { height: 42.5vw; } @media (max-width: 600px) { .cluster { height: 143vw; } } body.focus .cluster { height: auto; } .cluster canvas, .dial canvas { top: 0; left: 0; } body.focus .cluster { top: 0; right: 0; bottom: 0; left: 0; } }
+@media (max-width: 520px) {
+  .find .cols { grid-template-columns: 1fr; }
+  .val { font-size: 26px; }
+}
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+
+
+<div id="errBar" hidden></div>
+<div class="app">
+  <header class="top">
+    <div class="wrap top-in">
+      <div class="brand"><b>MGM</b> Sürüş Kokpiti</div>
+      <span class="pill" id="connPill"><i></i><span id="connTxt">Bağlı değil</span></span>
+      <div class="spacer"></div>
+      <button class="btn pri" id="btnConnect" type="button">ELM327'ye bağlan</button>
+      <button class="btn" id="btnDemo" type="button">Demo</button>
+    </div>
+    <nav class="wrap tabs" role="tablist" aria-label="Bölümler">
+      <button class="tab" role="tab" data-v="kokpit" aria-selected="true" type="button">Kokpit</button>
+      <button class="tab" role="tab" data-v="teshis" aria-selected="false" type="button">Akıllı teşhis<span class="n" id="nFind" hidden>0</span></button>
+      <button class="tab" role="tab" data-v="kodlar" aria-selected="false" type="button">Arıza kodları<span class="n c" id="nDtc" hidden>0</span></button>
+      <button class="tab" role="tab" data-v="yolculuk" aria-selected="false" type="button">Yolculuklar</button>
+      <button class="tab" role="tab" data-v="perf" aria-selected="false" type="button">Performans</button>
+      <button class="tab" role="tab" data-v="bakim" aria-selected="false" type="button">Bakım<span class="n" id="nMnt" hidden>0</span></button>
+      <button class="tab" role="tab" data-v="canli" aria-selected="false" type="button">Canlı veri</button>
+      <button class="tab" role="tab" data-v="ayar" aria-selected="false" type="button">Araç ve ayarlar</button>
+    </nav>
+  </header>
+
+  <main class="wrap">
+    <div class="note" id="btNote" hidden></div>
+
+    <!-- KOKPIT -->
+    <section class="view" id="v-kokpit">
+      <div class="themebar" id="themeBar" role="group" aria-label="Kokpit teması"></div>
+      <div class="cluster" id="clusterWrap" hidden>
+        <canvas id="clusterCv" aria-label="Sanal kokpit"></canvas>
+        <span class="focus-hint">Çıkmak için dokunun</span>
+      </div>
+      <div id="classic">
+      <div class="cockpit">
+        <div class="side">
+          <div class="card"><div class="lbl"><span>Su sıcaklığı</span><span id="coolNorm"></span></div><div class="val" id="kCool">--<small>°C</small></div><div class="bar"><span id="bCool"></span><em id="mCool" hidden></em></div></div>
+          <div class="card"><div class="lbl"><span>Yağ sıcaklığı</span></div><div class="val" id="kOil">--<small>°C</small></div></div>
+          <div class="card"><div class="lbl"><span>Emme havası</span><span id="kAmb"></span></div><div class="val" id="kIat">--<small>°C</small></div></div>
+          <div class="card"><div class="lbl"><span>Motor yükü</span></div><div class="val" id="kLoad">--<small>%</small></div><div class="bar"><span id="bLoad"></span></div></div>
+        </div>
+        <div class="center">
+          <div class="dial">
+            <canvas id="dialCv" aria-hidden="true"></canvas>
+            <div class="dial-c">
+              <div class="speed" id="kSpeed">0</div>
+              <div class="unit">km/sa</div>
+              <div class="rpmtxt" id="kRpm">0 d/dk</div>
+              <div class="subrow"><span><b id="kL100">--</b> L/100</span><span><b id="kLph">--</b> L/sa</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="side">
+          <div class="card"><div class="lbl"><span>Akü</span><span id="kVsrc"></span></div><div class="val" id="kBatt">--<small>V</small></div><div class="bar"><span id="bBatt"></span></div></div>
+          <div class="card"><div class="lbl"><span>Yakıt seviyesi</span></div><div class="val" id="kFuel">--<small>%</small></div><div class="bar"><span id="bFuel"></span></div></div>
+          <div class="card"><div class="lbl"><span id="kBoostL">Emme basıncı</span></div><div class="val" id="kBoost">--<small>kPa</small></div><div class="bar"><span id="bBoost"></span></div></div>
+          <div class="card"><div class="lbl"><span>Gaz pedalı</span></div><div class="val" id="kThr">--<small>%</small></div><div class="bar"><span id="bThr"></span></div></div>
+        </div>
+      </div>
+      </div>
+      <div class="kfoot">
+        <div class="lamps" id="lamps" aria-label="Uyarı lambaları"></div>
+        <button class="health-chip" id="healthChip" type="button">
+          <span class="sc" id="hcScore">--</span>
+          <span class="t"><b id="hcTitle">Araç sağlığı</b><span id="hcSub">Veri bekleniyor</span></span>
+        </button>
+      </div>
+      <div class="tripbar">
+        <div class="card"><div class="lbl">Yolculuk</div><div class="val" id="tKm">0,0<small>km</small></div></div>
+        <div class="card"><div class="lbl">Süre</div><div class="val" id="tTime">0:00</div></div>
+        <div class="card"><div class="lbl">Ortalama tüketim</div><div class="val" id="tAvg">--<small>L/100</small></div></div>
+        <div class="card"><div class="lbl">Harcanan yakıt</div><div class="val" id="tFuel">0,00<small>L</small></div></div>
+      </div>
+    </section>
+
+    <!-- TESHIS -->
+    <section class="view" id="v-teshis" hidden>
+      <div class="diag-top">
+        <div class="score">
+          <canvas id="scoreCv" width="320" height="320" aria-hidden="true"></canvas>
+          <h3 id="scTitle">Araç sağlığı</h3>
+          <p id="scSub">Sürüş verileri toplanıyor</p>
+        </div>
+        <div class="systems" id="systems"></div>
+      </div>
+      <div class="sec-h"><h2>Bulgular ve önlemler</h2><p>Önce acil olanlar. Her bulgu ölçülen değerlere dayanır.</p></div>
+      <div class="finds" id="finds"></div>
+      <div class="sec-h"><h2>Öğrenilen değerler</h2><p>Uygulama aracınızın normalini sürdükçe öğrenir.</p></div>
+      <div class="learn" id="learn"></div>
+    </section>
+
+    <!-- KODLAR -->
+    <section class="view" id="v-kodlar" hidden>
+      <div class="dtc-actions">
+        <button class="btn pri" id="btnReadDtc" type="button">Kodları oku</button>
+        <button class="btn danger" id="btnClearAsk" type="button">Kodları sil</button>
+        <span class="pill" id="milPill"><i></i><span id="milTxt">Arıza lambası: bilinmiyor</span></span>
+      </div>
+      <div class="confirm" id="clearBox" hidden>
+        <span>Kodlar ve hazırlık testleri silinir, arıza lambası söner. Sorun giderilmediyse kod geri gelir. Motor kapalı, kontak açık olmalı.</span>
+        <button class="btn danger" id="btnClearYes" type="button">Evet, sil</button>
+        <button class="btn" id="btnClearNo" type="button">Vazgeç</button>
+      </div>
+      <div class="sec-h"><h2>Kayıtlı ve bekleyen kodlar</h2><p id="dtcInfo">Henüz okunmadı.</p></div>
+      <div class="finds" id="dtcList"></div>
+      <div id="ffBox" hidden></div>
+      <div class="sec-h"><h2>Muayene hazırlık testi</h2><p>Egzoz emisyon muayenesinden önce motor beyninin kendi testleri tamamlanmış olmalı.</p></div>
+      <div id="readyBox"></div>
+    </section>
+
+    <!-- YOLCULUKLAR -->
+    <section class="view" id="v-yolculuk" hidden>
+      <div class="sec-h" style="margin-top:4px"><h2>Bu yolculuk</h2><p>Yakıt maliyeti ve sürüş puanı</p></div>
+      <div id="tripNow"></div>
+      <div class="sec-h"><h2>Aylık özet</h2><p id="monthNote">Son 6 ay</p></div>
+      <div id="monthSum"></div>
+      <div class="sec-h"><h2>Yolculuk geçmişi</h2><p>Son 20 yolculuk. Motor 2 dakika kapalı kalınca yolculuk kaydedilir; tamamı CSV ile alınabilir.</p></div>
+      <div class="tbl"><table><thead><tr><th>Tarih</th><th class="num">km</th><th class="num">dk</th><th class="num">L/100</th><th class="num">Maliyet</th><th class="num">Puan</th></tr></thead><tbody id="tripList"></tbody></table></div>
+      <div class="dtc-actions" style="margin-top:12px"><button class="btn" id="btnTripCsv" type="button">Yolculukları CSV olarak paylaş</button><span class="hint" id="tripMsg"></span></div>
+      <textarea id="tripMsgTa" class="csvta" hidden readonly aria-label="CSV metni"></textarea>
+    </section>
+
+    <!-- PERFORMANS -->
+    <section class="view" id="v-perf" hidden>
+      <div class="sec-h" style="margin-top:4px"><h2>Performans ölçümü</h2><p>Sadece trafiğe kapalı, güvenli bir alanda deneyin.</p></div>
+      <div class="dtc-actions"><button class="btn pri" type="button" data-perf="a100">0–100 km/sa</button><button class="btn pri" type="button" data-perf="m400">400 m</button><button class="btn pri" type="button" data-perf="b100">100–0 fren mesafesi</button></div>
+      <div id="perfLive" style="margin-top:12px"></div>
+      <div class="live" id="perfBest" style="margin-top:12px"></div>
+      <div class="sec-h"><h2>Son ölçümler</h2><p>Adaptörün veri hızı sınırlı olduğu için sonuç ±0,2 s sapabilir.</p></div>
+      <div class="tbl"><table><thead><tr><th>Tarih</th><th>Ölçüm</th><th class="num">Sonuç</th><th>Not</th></tr></thead><tbody id="perfHist"></tbody></table></div>
+      <div class="sec-h"><h2>Hız göstergesi sapması</h2><p>Aracın hızı ile GPS hızını karşılaştırır.</p></div>
+      <div class="dtc-actions"><button class="btn" id="btnGps" type="button">GPS karşılaştırmayı başlat</button></div>
+      <div id="gpsBox" style="margin-top:12px"></div>
+    </section>
+
+    <!-- BAKIM -->
+    <section class="view" id="v-bakim" hidden>
+      <div class="sec-h" style="margin-top:4px"><h2>Bakım defteri</h2><p>Kilometre ve tarihe göre hatırlatır; geciken işler teşhiste de görünür.</p></div>
+      <div class="form"><div class="field"><label for="mOdo">Aracın güncel kilometresi</label><input id="mOdo" type="number" step="1" min="0" placeholder="Göstergedeki km"></div></div>
+      <p class="hint">Bir kez girin; sonrası sürdükçe kendiliğinden artar.</p>
+      <div class="mnts" id="mntList"></div>
+    </section>
+
+    <!-- CANLI -->
+    <section class="view" id="v-canli" hidden>
+      <div class="sec-h" style="margin-top:4px"><h2>Canlı veri</h2><p id="liveInfo">Aracın desteklediği değerler</p></div>
+      <div class="dtc-actions" style="margin-bottom:12px"><button class="btn" id="btnRec" type="button">Kaydı başlat</button><button class="btn" id="btnRecCsv" type="button">Kaydı CSV olarak paylaş</button><span class="hint" id="recInfo">Saniyede bir satır, en fazla 4 saat</span></div>
+      <textarea id="recMsgTa" class="csvta" hidden readonly aria-label="CSV metni"></textarea><span class="hint" id="recMsg"></span>
+      <div class="live" id="liveGrid"></div>
+    </section>
+
+    <!-- AYARLAR -->
+    <section class="view" id="v-ayar" hidden>
+      <div class="sec-h" style="margin-top:4px"><h2>Araç</h2><p>Teşhis kuralları bu bilgilere göre çalışır.</p></div>
+      <div class="form">
+        <div class="field"><label for="sFuel">Yakıt</label>
+          <select id="sFuel"><option value="benzin">Benzin</option><option value="dizel">Dizel</option><option value="lpg">Benzin + LPG</option></select></div>
+        <div class="field"><label for="sDisp">Motor hacmi (L)</label><input id="sDisp" type="number" step="0.1" min="0.8" max="6"></div>
+        <div class="field"><label for="sTurbo">Turbo</label><select id="sTurbo"><option value="0">Yok</option><option value="1">Var</option></select></div>
+        <div class="field"><label for="sBoost">Tam gazda beklenen turbo basıncı (bar)</label><input id="sBoost" type="number" step="0.1" min="0.2" max="2.5"></div>
+        <div class="field"><label for="sPrice">Yakıt fiyatı (₺/L)</label><input id="sPrice" type="number" step="0.01" min="0" placeholder="örn. 47,50"></div>
+        <div class="field"><label for="sLimit">Hız sınırı uyarısı (km/sa, 0 = kapalı)</label><input id="sLimit" type="number" step="5" min="0" max="250"></div>
+        <div class="field"><label for="sNight">Otomatik gece teması</label><select id="sNight"><option value="">Kapalı</option><option value="gece">Gece</option><option value="hud">HUD</option><option value="luks">Lüks</option></select></div>
+      </div>
+      <div class="sec-h"><h2>Gösterge alanları</h2><p>Temalardaki bilgi kutularında hangi değerler görünsün.</p></div>
+      <div class="form" id="slotForm"></div>
+      <label class="check"><input type="checkbox" id="sVoice"> Acil bulgularda sesli uyarı</label>
+      <div class="sec-h"><h2>Demo arızaları</h2><p>Demo modunda teşhisin nasıl çalıştığını görmek için.</p></div>
+      <div class="form" id="demoFlags"></div>
+      <div class="sec-h"><h2>Bağlantı günlüğü</h2><p id="protoInfo">Protokol: -</p></div>
+      <div class="log" id="log"></div>
+      <div class="sec-h"><h2>Veriler</h2><p>Öğrenilen değerler ve yolculuk geçmişi bu cihazda saklanır.</p></div>
+      <div class="dtc-actions"><button class="btn danger" id="btnReset" type="button">Öğrenilenleri sıfırla</button><span id="resetMsg" class="pill" hidden></span></div>
+    </section>
+  </main>
+</div>
+
+<script>
+"use strict";
+if (typeof structuredClone !== "function") window.structuredClone = (o) => JSON.parse(JSON.stringify(o));
+if (!Object.fromEntries) Object.fromEntries = (it) => {
+  const o = {};
+  for (const [k, v] of it) o[k] = v;
+  return o;
+};
+(function() {
+  const show = (m) => {
+    const e = document.getElementById("errBar");
+    if (!e) return;
+    e.hidden = false;
+    e.textContent = "Hata: " + m + "  (bu yazının ekran görüntüsünü gönderin, dokununca kapanır)";
+    e.onclick = () => e.hidden = true;
+  };
+  window.addEventListener("error", (ev) => show((ev.message || "bilinmeyen") + (ev.lineno ? " @" + ev.lineno : "")));
+  window.addEventListener("unhandledrejection", (ev) => {
+    const r = ev.reason;
+    if (r && (r.name === "NotFoundError" || r.name === "AbortError")) return;
+    show(r && r.message ? r.message : String(r));
+  });
+})();
+const $ = (id) => document.getElementById(id);
+const fmt = (v, d = 0) => v == null || isNaN(v) ? "--" : v.toFixed(d).replace(".", ",");
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const now = () => Date.now();
+function store(k, v) {
+  try {
+    localStorage.setItem(k, JSON.stringify(v));
+  } catch (e) {
+  }
+}
+function load(k, d) {
+  try {
+    const s = localStorage.getItem(k);
+    return s ? Object.assign(structuredClone(d), JSON.parse(s)) : structuredClone(d);
+  } catch (e) {
+    return structuredClone(d);
+  }
+}
+const DEF_SET = { fuel: "benzin", disp: 1.6, turbo: 0, boost: 0.8, odo: 0, svcKm: 0, svcInt: 15e3, voice: false, hudMirror: false, price: 0, limit: 0, autoNight: "", slots: null };
+const DEF_LEARN = { coolN: 0, coolSum: 0, crank: [], warm: [], trips: [], km: 0 };
+let SET = load("mgmk.set", DEF_SET);
+let REAL_LEARN = load("mgmk.learn", DEF_LEARN);
+let LEARN = REAL_LEARN;
+const saveSet = () => store("mgmk.set", SET);
+const saveLearn = () => {
+  if (LEARN === REAL_LEARN) store("mgmk.learn", REAL_LEARN);
+};
+const PIDS = [
+  { k: "rpm", pid: 12, n: 2, f: (a, b) => (256 * a + b) / 4, grp: 0, name: "Devir", u: "d/dk", d: 0 },
+  { k: "speed", pid: 13, n: 1, f: (a) => a, grp: 0, name: "Hız", u: "km/sa", d: 0 },
+  { k: "load", pid: 4, n: 1, f: (a) => a * 100 / 255, grp: 0, name: "Motor yükü", u: "%", d: 0 },
+  { k: "thr", pid: 17, n: 1, f: (a) => a * 100 / 255, grp: 0, name: "Gaz pedalı", u: "%", d: 0 },
+  { k: "map", pid: 11, n: 1, f: (a) => a, grp: 0, name: "Emme basıncı", u: "kPa", d: 0 },
+  { k: "maf", pid: 16, n: 2, f: (a, b) => (256 * a + b) / 100, grp: 1, name: "Hava akışı", u: "g/s", d: 1 },
+  { k: "cool", pid: 5, n: 1, f: (a) => a - 40, grp: 1, name: "Su sıcaklığı", u: "°C", d: 0 },
+  { k: "stft", pid: 6, n: 1, f: (a) => (a - 128) * 100 / 128, grp: 1, name: "Kısa yakıt ayarı", u: "%", d: 1 },
+  { k: "ltft", pid: 7, n: 1, f: (a) => (a - 128) * 100 / 128, grp: 1, name: "Uzun yakıt ayarı", u: "%", d: 1 },
+  { k: "iat", pid: 15, n: 1, f: (a) => a - 40, grp: 1, name: "Emme havası", u: "°C", d: 0 },
+  { k: "adv", pid: 14, n: 1, f: (a) => a / 2 - 64, grp: 1, name: "Ateşleme avansı", u: "°", d: 1 },
+  { k: "o2a", pid: 20, n: 2, f: (a) => a / 200, grp: 1, name: "Oksijen sensörü 1", u: "V", d: 2 },
+  { k: "o2b", pid: 21, n: 2, f: (a) => a / 200, grp: 1, name: "Oksijen sensörü 2", u: "V", d: 2 },
+  { k: "frate", pid: 94, n: 2, f: (a, b) => (256 * a + b) / 20, grp: 1, name: "Yakıt debisi", u: "L/sa", d: 1 },
+  { k: "egrE", pid: 45, n: 1, f: (a) => (a - 128) * 100 / 128, grp: 1, name: "EGR hatası", u: "%", d: 0 },
+  { k: "fuel", pid: 47, n: 1, f: (a) => a * 100 / 255, grp: 2, name: "Yakıt seviyesi", u: "%", d: 0 },
+  { k: "amb", pid: 70, n: 1, f: (a) => a - 40, grp: 2, name: "Dış hava", u: "°C", d: 0 },
+  { k: "oil", pid: 92, n: 1, f: (a) => a - 40, grp: 2, name: "Yağ sıcaklığı", u: "°C", d: 0 },
+  { k: "baro", pid: 51, n: 1, f: (a) => a, grp: 2, name: "Atmosfer basıncı", u: "kPa", d: 0 },
+  { k: "ecuV", pid: 66, n: 2, f: (a, b) => (256 * a + b) / 1e3, grp: 2, name: "ECU voltajı", u: "V", d: 1 },
+  { k: "dpfT", pid: 124, n: 3, f: (a, b, c) => (256 * b + c) / 10 - 40, grp: 2, name: "DPF sıcaklığı", u: "°C", d: 0 },
+  { k: "clrKm", pid: 49, n: 2, f: (a, b) => 256 * a + b, grp: 2, name: "Kod silmeden beri", u: "km", d: 0 }
+];
+const PBYK = Object.fromEntries(PIDS.map((p) => [p.k, p]));
+const EXTRA = [
+  // hesaplanan / AT
+  { k: "batt", name: "Akü (adaptör)", u: "V", d: 1 },
+  { k: "boost", name: "Turbo basıncı", u: "bar", d: 2 },
+  { k: "lph", name: "Anlık yakıt", u: "L/sa", d: 1 },
+  { k: "l100", name: "Anlık tüketim", u: "L/100", d: 1 }
+];
+const S = {
+  mode: "off",
+  // off | busy | on | demo
+  v: {},
+  at: {},
+  sup: /* @__PURE__ */ new Set(),
+  hist: {},
+  isCan: false,
+  proto: "",
+  trip: { km: 0, sec: 0, L: 0, start: 0, maxCool: 0, warm: false, lastT: 0 },
+  dtc: { read: false, mil: false, count: 0, stored: [], pending: [], perm: [] },
+  diesel: false
+};
+const HIST_N = 120;
+function setV(k, val) {
+  if (val == null || !isFinite(val)) return;
+  S.v[k] = val;
+  S.at[k] = now();
+  const h = S.hist[k] || (S.hist[k] = []);
+  h.push(val);
+  if (h.length > HIST_N) h.shift();
+}
+const fresh = (k, ms = 4e3) => S.v[k] != null && now() - (S.at[k] || 0) < ms;
+const V = (k) => fresh(k, 6e3) ? S.v[k] : null;
+const LOG = [];
+function log(s) {
+  const t = (/* @__PURE__ */ new Date()).toTimeString().slice(0, 8);
+  LOG.push(t + "  " + s);
+  if (LOG.length > 200) LOG.shift();
+  const el = $("log");
+  if (el && !$("v-ayar").hidden) {
+    el.textContent = LOG.slice(-60).join("\n");
+    el.scrollTop = 1e9;
+  }
+}
+const ELM_SVCS = [65520, 65504, 6384, 65248, 65440, "e7810a71-73ae-499d-8c15-faa9aef0c3f2", "6e400001-b5a3-f393-e0a9-e50e24dcca9e", "0000ae30-0000-1000-8000-00805f9b34fb"];
+const Elm = {
+  dev: null,
+  rx: null,
+  tx: null,
+  buf: "",
+  wait: null,
+  q: Promise.resolve(),
+  nr: false,
+  async connect() {
+    this.dev = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: ELM_SVCS });
+    log("Seçilen cihaz: " + (this.dev.name || "adsız"));
+    this.dev.addEventListener("gattserverdisconnected", () => {
+      log("Bağlantı koptu");
+      onLinkLost();
+    });
+    const srv = await this.dev.gatt.connect();
+    const svcs = await srv.getPrimaryServices();
+    for (const s of svcs) {
+      let chars = [];
+      try {
+        chars = await s.getCharacteristics();
+      } catch (e) {
+        continue;
+      }
+      const n = chars.find((c) => c.properties.notify || c.properties.indicate);
+      const w = chars.find((c) => c.properties.write || c.properties.writeWithoutResponse);
+      if (n && w) {
+        this.rx = n;
+        this.tx = w;
+        this.nr = !w.properties.write && w.properties.writeWithoutResponse;
+        log("Servis " + s.uuid.slice(4, 8) + ": okuma " + n.uuid.slice(4, 8) + ", yazma " + w.uuid.slice(4, 8));
+        break;
+      }
+    }
+    if (!this.rx) throw new Error("Bu cihazda ELM327 seri servisi bulunamadı");
+    this.rx.addEventListener("characteristicvaluechanged", (e) => this.onData(e.target.value));
+    await this.rx.startNotifications();
+  },
+  onData(dv) {
+    let s = "";
+    for (let i = 0; i < dv.byteLength; i++) s += String.fromCharCode(dv.getUint8(i));
+    this.onText(s);
+  },
+  send(cmd, ms = 2500) {
+    const run = async () => {
+      this.buf = "";
+      const p = new Promise((res) => {
+        this.wait = { res };
+        setTimeout(() => {
+          if (this.wait && this.wait.res === res) {
+            this.wait = null;
+            res(null);
+          }
+        }, ms);
+      });
+      await this.writeStr(cmd + "\r");
+      return p;
+    };
+    const r = this.q.then(run, run);
+    this.q = r.catch(() => {
+    });
+    return r;
+  },
+  async writeStr(str) {
+    const data = new TextEncoder().encode(str);
+    for (let i = 0; i < data.length; i += 20) {
+      const ch = data.slice(i, i + 20);
+      if (this.nr) await this.tx.writeValueWithoutResponse(ch);
+      else await this.tx.writeValue(ch);
+    }
+  },
+  onText(s) {
+    this.buf += s;
+    const p = this.buf.indexOf(">");
+    if (p >= 0 && this.wait) {
+      const r = this.buf.slice(0, p);
+      this.buf = this.buf.slice(p + 1);
+      const w = this.wait;
+      this.wait = null;
+      w.res(r);
+    }
+  },
+  disconnect() {
+    try {
+      this.dev && this.dev.gatt.disconnect();
+    } catch (e) {
+    }
+  }
+};
+if (window.MGMNative) {
+  Object.assign(Elm, {
+    connect() {
+      return new Promise((res, rej) => {
+        this._res = res;
+        this._rej = rej;
+        MGMNative.pick();
+      });
+    },
+    async writeStr(str) {
+      MGMNative.write(str);
+    },
+    disconnect() {
+      try {
+        MGMNative.disconnect();
+      } catch (e) {
+      }
+    }
+  });
+  window.MGMN = {
+    onConnected(name) {
+      Elm.dev = { name };
+      log("Bağlandı: " + name);
+      const r = Elm._res;
+      Elm._res = Elm._rej = null;
+      if (r) r();
+    },
+    onError(msg) {
+      log("Hata: " + msg);
+      const j = Elm._rej;
+      Elm._res = Elm._rej = null;
+      if (j) j(new Error(msg));
+    },
+    onData(s) {
+      Elm.onText(s);
+    },
+    onDisconnected() {
+      log("Bağlantı koptu");
+      onLinkLost();
+    },
+    onBack() {
+      if (document.body.classList.contains("focus")) exitFocus();
+      else if ($("v-kokpit").hidden) showView("kokpit");
+      else MGMNative.exit();
+    }
+  };
+}
+function parsePid(resp, pid) {
+  if (!resp) return null;
+  const want = "41" + pid.toString(16).toUpperCase().padStart(2, "0");
+  for (const line of resp.replace(/ /g, "").toUpperCase().split(/[\r\n]+/)) {
+    const l = line.replace(/^[0-9A-F]{1,3}:/, "");
+    const i = l.indexOf(want);
+    if (i < 0) continue;
+    const hex = l.slice(i + 4);
+    const out = [];
+    for (let j = 0; j + 1 < hex.length; j += 2) out.push(parseInt(hex.substr(j, 2), 16));
+    return out;
+  }
+  return null;
+}
+function parseDtc(resp, mode) {
+  if (!resp) return [];
+  const want = "4" + mode;
+  const clean = resp.toUpperCase().replace(/ /g, "");
+  if (clean.includes("NODATA")) return [];
+  const bytes = [];
+  let started = false;
+  for (let line of clean.split(/[\r\n]+/)) {
+    line = line.replace(/^[0-9A-F]{1,3}:/, "");
+    let h = started ? line : line.indexOf(want) >= 0 ? line.slice(line.indexOf(want) + 2) : null;
+    if (h == null) continue;
+    if (!started) {
+      started = true;
+      if (S.isCan) h = h.slice(2);
+    }
+    for (let j = 0; j + 1 < h.length; j += 2) bytes.push(parseInt(h.substr(j, 2), 16));
+  }
+  const L = "PCBU", out = [];
+  for (let i = 0; i + 1 < bytes.length; i += 2) {
+    const c = bytes[i] << 8 | bytes[i + 1];
+    if (!c) continue;
+    out.push(L[c >> 14] + (c >> 12 & 3) + (c & 4095).toString(16).toUpperCase().padStart(3, "0"));
+  }
+  return [...new Set(out)];
+}
+async function connectReal() {
+  if (!navigator.bluetooth && !window.MGMNative) {
+    showBtNote(true);
+    return;
+  }
+  stopDemo();
+  setMode("busy", "Bağlanıyor");
+  try {
+    await Elm.connect();
+    setMode("busy", "Adaptör hazırlanıyor");
+    for (const c of ["ATZ", "ATE0", "ATL0", "ATS0", "ATH0", "ATAT1", "ATSP0"]) {
+      const r2 = await Elm.send(c, c === "ATZ" ? 3e3 : 1500);
+      log(c + " → " + (r2 || "yanıt yok").trim().replace(/\s+/g, " "));
+    }
+    let r = await Elm.send("0100", 8e3);
+    log("0100 → " + (r || "yanıt yok").trim().replace(/\s+/g, " "));
+    if (!parsePid(r, 0)) throw new Error("Araç yanıt vermedi (kontak açık mı?)");
+    S.sup.clear();
+    for (const base of [0, 32, 64, 96]) {
+      const resp = base === 0 ? r : await Elm.send("01" + base.toString(16).padStart(2, "0").toUpperCase(), 3e3);
+      const b = parsePid(resp, base);
+      if (!b || b.length < 4) break;
+      for (let i = 0; i < 32; i++) if (b[i >> 3] & 128 >> (i & 7)) S.sup.add(base + i + 1);
+      if (!(b[3] & 1)) break;
+    }
+    const dp = await Elm.send("ATDPN", 1500);
+    const pn = parseInt((dp || "").replace(/[^0-9A-F]/gi, "").slice(-1), 16);
+    S.isCan = pn >= 6 && pn <= 9;
+    S.proto = (dp || "").trim();
+    $("protoInfo").textContent = "Protokol: " + (S.isCan ? "CAN" : "eski tip") + " (" + S.proto + "), " + S.sup.size + " değer destekleniyor";
+    log("Desteklenen PID sayısı: " + S.sup.size + (S.isCan ? " (CAN)" : ""));
+    setMode("on", Elm.dev && Elm.dev.name || "ELM327");
+    resetTrip();
+    requestWake();
+    pollLoop();
+    readDtc();
+  } catch (e) {
+    log("Hata: " + e.message);
+    setMode("off", "Bağlı değil");
+    showMsg(e.name === "NotFoundError" ? "Cihaz seçilmedi." : e.message);
+  }
+}
+function onLinkLost() {
+  if (S.mode === "on") {
+    endTrip();
+    setMode("off", "Bağlantı koptu");
+  }
+}
+let pollCycle = 0;
+async function pollLoop() {
+  while (S.mode === "on") {
+    pollCycle++;
+    const notRunning = !(S.v.rpm > 400);
+    const list = S.perfFast ? PIDS.filter((p) => S.sup.has(p.pid) && (p.k === "speed" || p.k === "rpm" && pollCycle % 4 === 0)) : PIDS.filter((p) => S.sup.has(p.pid) && (p.grp === 0 || p.grp === 1 && pollCycle % 3 === 0 || p.grp === 2 && pollCycle % 12 === 1));
+    for (const p of list) {
+      if (S.mode !== "on") return;
+      if (p.k === "dpfT" && !S.diesel) continue;
+      const r = await Elm.send("01" + p.pid.toString(16).padStart(2, "0").toUpperCase(), 1200);
+      const b = parsePid(r, p.pid);
+      if (b && b.length >= p.n) setV(p.k, p.f(...b));
+      if (notRunning && p.grp === 0) await pollBatt();
+    }
+    if (!S.perfFast && (pollCycle % 6 === 0 || notRunning)) await pollBatt();
+    if (pollCycle % 30 === 5) await pollStatus();
+    derive();
+  }
+}
+async function pollBatt() {
+  const r = await Elm.send("ATRV", 1e3);
+  const m = r && r.match(/(\d+(?:\.\d+)?)\s*V/i);
+  if (m) setV("batt", parseFloat(m[1]));
+}
+async function pollStatus() {
+  const b = parsePid(await Elm.send("0101", 1500), 1);
+  if (b && b.length >= 2) {
+    S.dtc.mil = !!(b[0] & 128);
+    S.dtc.count = b[0] & 127;
+    S.diesel = !!(b[1] & 8);
+  }
+  if (b && b.length >= 4) S.ready = b.slice(0, 4);
+}
+async function readDtc() {
+  if (S.mode === "demo") {
+    demoDtc();
+    return;
+  }
+  if (S.mode !== "on") {
+    showMsg("Önce adaptöre bağlanın veya demoyu açın.");
+    return;
+  }
+  $("dtcInfo").textContent = "Okunuyor...";
+  await pollStatus();
+  S.dtc.stored = parseDtc(await Elm.send("03", 5e3), "3");
+  S.dtc.pending = parseDtc(await Elm.send("07", 5e3), "7");
+  S.dtc.perm = parseDtc(await Elm.send("0A", 5e3), "A");
+  S.dtc.read = true;
+  S.dtc.at = now();
+  if (S.dtc.stored.length || S.dtc.pending.length) {
+    try {
+      await readFreeze();
+    } catch (e) {
+    }
+  } else S.freeze = null;
+  log("Kodlar: kayıtlı " + S.dtc.stored.join(",") + " | bekleyen " + S.dtc.pending.join(",") + " | kalıcı " + S.dtc.perm.join(","));
+  renderDtc();
+}
+async function clearDtc() {
+  $("clearBox").hidden = true;
+  if (S.mode === "demo") {
+    S.dtc.stored = [];
+    S.dtc.pending = [];
+    S.dtc.mil = false;
+    S.dtc.count = 0;
+    renderDtc();
+    showMsg("Demo: kodlar silindi.");
+    return;
+  }
+  if (S.mode !== "on") return;
+  if (S.v.rpm > 300) {
+    showMsg("Kod silmek için motoru durdurun, kontağı açık bırakın.");
+    return;
+  }
+  const r = await Elm.send("04", 5e3);
+  log("04 → " + (r || "yanıt yok").trim());
+  await readDtc();
+}
+function derive() {
+  var _a;
+  const v = S.v;
+  const baro = (_a = V("baro")) != null ? _a : 101;
+  if (V("map") != null) setV("boost", (v.map - baro) / 100);
+  let maf = V("maf");
+  if (maf == null && V("map") != null && V("rpm") != null && V("iat") != null) {
+    const kg = v.map * 1e3 * SET.disp / 1e3 / (287.05 * (v.iat + 273.15));
+    maf = v.rpm / 120 * kg * 0.85 * 1e3;
+  }
+  let lph = V("frate");
+  const fuelType = effFuel();
+  if (lph == null && maf != null && fuelType !== "dizel") {
+    const afr = fuelType === "lpg" ? 15.5 : 14.7, dens = fuelType === "lpg" ? 540 : 745;
+    lph = maf / afr * 3600 / dens;
+  }
+  if (lph != null) {
+    if ((v.rpm || 0) < 100) lph = 0;
+    setV("lph", lph);
+  }
+  if (V("lph") != null && V("speed") != null) setV("l100", v.speed > 3 ? v.lph / v.speed * 100 : null);
+  const t = now(), tr = S.trip;
+  if (tr.lastT) {
+    const dt = (t - tr.lastT) / 1e3;
+    if (dt < 5) {
+      if ((v.rpm || 0) > 400) tr.sec += dt;
+      tr.km += (V("speed") || 0) * dt / 3600;
+      tr.L += (V("lph") || 0) * dt / 3600;
+      LEARN.km += (V("speed") || 0) * dt / 3600;
+    }
+  }
+  tr.lastT = t;
+  if (S.at.speed && S.at.speed !== S.lastSpdAt) {
+    S.lastSpdAt = S.at.speed;
+    perfSample(S.v.speed, S.at.speed);
+    drvSample(S.v.speed, S.at.speed);
+  }
+  if (V("cool") != null) {
+    tr.maxCool = Math.max(tr.maxCool, v.cool);
+    if (v.cool >= 80) tr.warm = true;
+  }
+}
+function resetTrip() {
+  S.trip = { km: 0, sec: 0, L: 0, start: now(), maxCool: 0, warm: false, lastT: 0, ev: { acc: 0, brk: 0, idle: 0, over: 0, rev: 0, maxSpd: 0 } };
+  R.coldRev = 0;
+}
+function endTrip() {
+  const tr = S.trip;
+  if (tr.sec > 60) {
+    LEARN.trips.push(tripRecord(tr));
+    if (LEARN.trips.length > 300) LEARN.trips.shift();
+    saveLearn();
+  }
+}
+const effFuel = () => SET.fuel === "dizel" || S.diesel ? "dizel" : SET.fuel === "lpg" ? "lpg" : "benzin";
+const SYS = [
+  { k: "aku", name: "Akü ve şarj" },
+  { k: "sogutma", name: "Soğutma" },
+  { k: "karisim", name: "Yakıt ve karışım" },
+  { k: "atesleme", name: "Ateşleme ve rölanti" },
+  { k: "hava", name: "Hava emişi ve turbo" },
+  { k: "egzoz", name: "Egzoz, katalizör, DPF" },
+  { k: "kod", name: "Arıza kodları" },
+  { k: "bakim", name: "Bakım ve kullanım" }
+];
+const SEV_TXT = { crit: "Acil", warn: "Dikkat", info: "Bilgi", ok: "Normal", na: "Veri yok" };
+const SEV_W = { crit: 45, warn: 18, info: 5 };
+const F = /* @__PURE__ */ new Map();
+const R = {};
+const holdT = {};
+function hold(id, cond, sec) {
+  if (!cond) {
+    holdT[id] = 0;
+    return false;
+  }
+  holdT[id] = (holdT[id] || 0) + 1;
+  return holdT[id] >= sec;
+}
+function put(f) {
+  const old = F.get(f.id);
+  f.at = old ? old.at : now();
+  F.set(f.id, f);
+  if (!old && f.sev === "crit") speak(f.title);
+}
+function drop(id) {
+  F.delete(id);
+}
+function stats(arr) {
+  if (!arr.length) return { m: 0, sd: 0 };
+  const m = arr.reduce((a, b) => a + b, 0) / arr.length;
+  return { m, sd: Math.sqrt(arr.reduce((a, b) => a + (b - m) * (b - m), 0) / arr.length) };
+}
+const ema = (o, k, x, a = 0.05) => {
+  o[k] = o[k] == null ? x : o[k] + (x - o[k]) * a;
+  o[k + "N"] = (o[k + "N"] || 0) + 1;
+};
+function diagTick() {
+  var _a, _b, _c, _d, _e, _f, _g, _h;
+  const v = S.v, fuel = effFuel(), dz = fuel === "dizel";
+  const rpm = (_a = V("rpm")) != null ? _a : 0, spd = (_b = V("speed")) != null ? _b : 0, cool = V("cool"), batt = (_c = V("batt")) != null ? _c : V("ecuV");
+  const running = rpm > 450, warmIdle = running && spd < 2 && rpm < 1200 && cool != null && cool > 75;
+  const cr = R.crank || (R.crank = { st: "idle", min: 99, rest: null });
+  if (batt != null) {
+    if (rpm < 50 && cr.st !== "crank") {
+      cr.rest = batt;
+      cr.st = "off";
+    }
+    if (cr.st === "off" && rpm >= 50 && rpm < 450) {
+      cr.st = "crank";
+      cr.min = batt;
+    }
+    if (cr.st === "crank") {
+      cr.min = Math.min(cr.min, batt);
+      if (rpm >= 600) {
+        cr.st = "run";
+        LEARN.crank.push({ t: now(), min: +cr.min.toFixed(2), rest: cr.rest != null ? +cr.rest.toFixed(2) : null });
+        if (LEARN.crank.length > 12) LEARN.crank.shift();
+        saveLearn();
+      }
+    }
+  }
+  const lastCr = LEARN.crank[LEARN.crank.length - 1];
+  if (lastCr) {
+    const tr2 = LEARN.crank.slice(-6).map((c) => c.min), first = tr2[0], last = tr2[tr2.length - 1];
+    const falling = tr2.length >= 4 && first - last > 0.4;
+    if (lastCr.min < 9.6) put({
+      id: "crank",
+      sys: "aku",
+      sev: "crit",
+      title: "Akü marşta çok zayıf",
+      ev: "Son marşta voltaj ".concat(fmt(lastCr.min, 1), " V'a düştü (sağlıklı akü 10,0 V üstünde kalır)"),
+      causes: ["Akü ömrünü doldurmuş (genelde 4–6 yıl)", "Kutup başları oksitli veya gevşek", "Marş motoru fazla akım çekiyor"],
+      acts: ["Aküyü bir serviste yük testinden geçirin", "Soğuk sabahlardan önce aküyü değiştirin", "Kutup başlarını temizleyip sıkın"],
+      when: "Bu hafta"
+    });
+    else if (lastCr.min < 10.2 || falling) put({
+      id: "crank",
+      sys: "aku",
+      sev: "warn",
+      title: falling ? "Akü marş gücü düşüyor" : "Akü marşta zayıflamaya başladı",
+      ev: falling ? "Son ".concat(tr2.length, " marşta en düşük voltaj ").concat(fmt(first, 1), " → ").concat(fmt(last, 1), " V") : "Son marşta voltaj ".concat(fmt(lastCr.min, 1), " V'a düştü"),
+      causes: ["Akü yaşlanıyor", "Kısa yolculuklar aküyü tam doldurmuyor", "Kutup başlarında direnç"],
+      acts: ["Akü testini sonraki bakımda yaptırın", "Haftada bir en az 30 dk kesintisiz sürün", "Kışa girmeden aküyü kontrol ettirin"],
+      when: "Önümüzdeki ay"
+    });
+    else drop("crank");
+    if (lastCr.rest != null && lastCr.rest < 12.2) put({
+      id: "rest",
+      sys: "aku",
+      sev: "warn",
+      title: "Akü tam dolu değil",
+      ev: "Marştan önce dinlenme voltajı ".concat(fmt(lastCr.rest, 2), " V (dolu akü 12,5–12,7 V)"),
+      causes: ["Araç uzun süre bekledi", "Kontak kapalıyken akım çeken bir tüketici var", "Şarj sistemi yetersiz"],
+      acts: ["Aküyü şarj cihazıyla tam doldurun", "Bekleme akımını (kaçak akım) ölçtürün"],
+      when: "Bu hafta"
+    });
+    else drop("rest");
+  }
+  R.chg = R.chg || [];
+  if (running && batt != null && rpm > 900) {
+    R.chg.push(batt);
+    if (R.chg.length > 60) R.chg.shift();
+  } else if (!running) R.chg = [];
+  if (R.chg.length >= 40) {
+    const m = stats(R.chg).m;
+    if (m < 12.8) put({
+      id: "chg",
+      sys: "aku",
+      sev: "crit",
+      title: "Şarj dinamosu aküyü doldurmuyor",
+      ev: "Motor çalışırken ortalama ".concat(fmt(m, 2), " V (normal 13,6–14,6 V)"),
+      causes: ["Şarj dinamosu (alternatör) arızalı", "Kayış gevşek veya kopuk", "Voltaj regülatörü arızalı"],
+      acts: ["Gereksiz tüketicileri kapatın", "En kısa sürede oto elektrikçiye gidin", "Akü bitebilir: uzun yola çıkmayın"],
+      when: "Bugün"
+    });
+    else if (m < 13.2) put({
+      id: "chg",
+      sys: "aku",
+      sev: "warn",
+      title: "Şarj voltajı düşük",
+      ev: "Motor çalışırken ortalama ".concat(fmt(m, 2), " V (normal 13,6–14,6 V)"),
+      causes: ["Şarj dinamosu zayıflıyor", "Kayış kayıyor", "Akıllı şarj sistemi (bazı yeni araçlarda normaldir)"],
+      acts: ["Şarj sistemini test ettirin", "Kayış gerginliğine baktırın"],
+      when: "Önümüzdeki hafta"
+    });
+    else if (m > 15) put({
+      id: "chg",
+      sys: "aku",
+      sev: "crit",
+      title: "Aşırı şarj voltajı",
+      ev: "Ortalama ".concat(fmt(m, 2), " V (üst sınır 14,8 V)"),
+      causes: ["Voltaj regülatörü arızalı"],
+      acts: ["Aküyü ve elektronik aksamı korumak için hemen kontrol ettirin"],
+      when: "Bugün"
+    });
+    else drop("chg");
+  }
+  if (cool != null) {
+    if (running && cool > 75 && spd > 40 && cool < 115) {
+      LEARN.coolN++;
+      LEARN.coolSum += cool;
+      if (LEARN.coolN > 3e3) {
+        LEARN.coolSum *= 0.5;
+        LEARN.coolN = Math.round(LEARN.coolN * 0.5);
+      }
+    }
+    const norm = LEARN.coolN > 60 ? LEARN.coolSum / LEARN.coolN : null;
+    if (hold("hot", cool >= 108, 10)) put({
+      id: "hot",
+      sys: "sogutma",
+      sev: "crit",
+      title: "Motor hararet yapıyor",
+      ev: "Su sıcaklığı ".concat(fmt(cool), " °C"),
+      causes: ["Soğutma suyu eksik veya kaçak var", "Fan çalışmıyor", "Termostat kapalı kalmış", "Su pompası arızalı"],
+      acts: ["Güvenli bir yerde durun, motoru rölantide 1–2 dk çalıştırıp kapatın", "Motor soğumadan radyatör kapağını açmayın", "Soğutma suyu seviyesini kontrol edin, çekici çağırmayı düşünün"],
+      when: "Hemen"
+    });
+    else if (norm && hold("trend", running && cool >= norm + 8 && cool < 108, 45)) put({
+      id: "hot",
+      sys: "sogutma",
+      sev: "warn",
+      title: "Motor normalinden sıcak çalışıyor",
+      ev: "".concat(fmt(cool), " °C, öğrenilen normal ").concat(fmt(norm), " °C"),
+      causes: ["Soğutma suyu azalmış", "Radyatör dıştan tıkanmış (böcek, toz)", "Fan geç devreye giriyor", "Termostat tam açılmıyor"],
+      acts: ["Motor soğukken soğutma suyu seviyesine bakın", "Altında su izi veya tatlı koku var mı kontrol edin", "Yokuşta ve trafikte sıcaklığı izleyin"],
+      when: "Bu hafta"
+    });
+    else if (cool < 104) drop("hot");
+    if (hold("fan", running && spd < 3 && cool >= 103, 60)) put({
+      id: "fan",
+      sys: "sogutma",
+      sev: "warn",
+      title: "Rölantide sıcaklık yükseliyor",
+      ev: "Araç dururken ".concat(fmt(cool), " °C"),
+      causes: ["Radyatör fanı çalışmıyor veya geç çalışıyor", "Fan rölesi / sigortası", "Sıcaklık sensörü"],
+      acts: ["Motor sıcakken fanın dönüp dönmediğine bakın", "Fan sigortasını ve rölesini kontrol edin"],
+      when: "Bu hafta"
+    });
+    const w = R.warm || (R.warm = { t0: 0, spd: [] });
+    if (running && cool < 45 && !w.t0) {
+      w.t0 = now();
+      w.spd = [];
+    }
+    if (w.t0) {
+      w.spd.push(spd);
+      const min = (now() - w.t0) / 6e4, avg = stats(w.spd).m;
+      if (cool >= 80) {
+        LEARN.warm.push({ t: now(), min: +min.toFixed(1), spd: Math.round(avg) });
+        if (LEARN.warm.length > 10) LEARN.warm.shift();
+        saveLearn();
+        w.t0 = 0;
+      } else if (min > 25 && avg > 30 && cool < 70) {
+        LEARN.warm.push({ t: now(), min: 25, spd: Math.round(avg), stuck: true });
+        saveLearn();
+        w.t0 = 0;
+      }
+    }
+    if (hold("tsOpen", S.trip.maxCool >= 85 && spd > 70 && cool < 75, 120)) put({
+      id: "thermo",
+      sys: "sogutma",
+      sev: "warn",
+      title: "Termostat açık kalmış olabilir",
+      ev: "Yolculukta ".concat(fmt(S.trip.maxCool), " °C'ye çıktı, hızlı giderken ").concat(fmt(cool), " °C'ye düştü"),
+      causes: ["Termostat açık kalmış"],
+      acts: ["Termostatı değiştirin (soğuk motor yakıtı artırır, aşınmayı hızlandırır)", "Kışın kalorifer yeterince ısıtmıyorsa aynı sebep"],
+      when: "Sonraki bakımda"
+    });
+  }
+  const lw = LEARN.warm.slice(-4), lim = dz ? 20 : 15;
+  if (lw.length >= 2 && lw.filter((x) => x.min > lim && x.spd > 25).length >= 2) {
+    put({
+      id: "thermo",
+      sys: "sogutma",
+      sev: "warn",
+      title: "Motor geç ısınıyor: termostat açık kalmış olabilir",
+      ev: "Son ısınmalar: ".concat(lw.map((x) => fmt(x.min, 0) + " dk").join(", "), " (normal ").concat(dz ? "10–15" : "6–12", " dk)"),
+      causes: ["Termostat açık kalmış", "Su sıcaklık sensörü hatalı"],
+      acts: ["Termostatı kontrol ettirin, gerekirse değiştirin", "Soğuk motor fazla yakıt yakar ve motoru aşındırır"],
+      when: "Sonraki bakımda"
+    });
+  }
+  const oil = V("oil");
+  if (oil != null) {
+    if (hold("oil", oil >= 130, 30)) put({ id: "oil", sys: "sogutma", sev: "warn", title: "Yağ sıcaklığı yüksek", ev: "Yağ ".concat(fmt(oil), " °C"), causes: ["Ağır yük / römork, uzun yokuş", "Yağ eksik veya eskimiş", "Yağ soğutucusu tıkalı"], acts: ["Devri ve yükü azaltın", "Yağ seviyesini ve rengini kontrol edin"], when: "Bugün" });
+    else if (oil < 122) drop("oil");
+  }
+  const st = V("stft"), lt = V("ltft");
+  if (!dz && st != null && lt != null) {
+    const tot = st + lt, T = R.trim || (R.trim = {});
+    if (warmIdle) ema(T, "idle", tot);
+    if (running && cool > 75 && spd > 50 && spd < 120 && ((_d = V("load")) != null ? _d : 40) > 15 && ((_e = V("load")) != null ? _e : 40) < 70) ema(T, "cruise", tot);
+    const lpg = fuel === "lpg";
+    const lpgCause = lpg ? ["LPG ayarı (kalibrasyon) kaymış", "LPG filtreleri tıkalı", "LPG enjektörleri / regülatör"] : [];
+    if (T.idleN > 20) {
+      const cru = T.cruiseN > 20 ? T.cruise : null;
+      if (T.idle > 12 && (cru == null || cru < T.idle - 6)) put({
+        id: "trim",
+        sys: "karisim",
+        sev: "warn",
+        title: "Rölantide fakir karışım: vakum kaçağı olası",
+        ev: "Toplam yakıt ayarı rölantide %".concat(fmt(T.idle, 0)).concat(cru != null ? ", seyirde %" + fmt(cru, 0) : "", " (normal ±%8)"),
+        causes: ["Emme manifoldu / vakum hortumu çatlak", "PCV (karter havalandırma) valfi", "Fren servosu hortumu", ...lpgCause],
+        acts: ["Motor çalışırken hortumlarda tıslama sesi arayın", "Serviste duman testi ile kaçak aratın", "Uzun süre böyle kalırsa katalizöre zarar verebilir"],
+        when: "Önümüzdeki 2 hafta"
+      });
+      else if (T.idle > 10 && cru != null && cru > 10) put({
+        id: "trim",
+        sys: "karisim",
+        sev: "warn",
+        title: "Her devirde fakir karışım",
+        ev: "Toplam yakıt ayarı rölantide %".concat(fmt(T.idle, 0), ", seyirde %").concat(fmt(cru, 0)),
+        causes: ["Yakıt pompası / filtresi zayıf (düşük basınç)", "Hava akış (MAF) sensörü kirli", "Enjektörler tıkanmaya başlamış", ...lpgCause],
+        acts: ["Yakıt filtresini değiştirin", "MAF sensörünü özel spreyle temizleyin", "Yakıt basıncını ölçtürün"],
+        when: "Önümüzdeki 2 hafta"
+      });
+      else if (T.idle < -12 || cru != null && cru < -12) put({
+        id: "trim",
+        sys: "karisim",
+        sev: "warn",
+        title: "Zengin karışım: fazla yakıt",
+        ev: "Toplam yakıt ayarı rölantide %".concat(fmt(T.idle, 0)).concat(cru != null ? ", seyirde %" + fmt(cru, 0) : ""),
+        causes: ["Enjektör damlatıyor", "Oksijen sensörü yavaşlamış", "Kanister (buhar) valfi açık kalmış", "Yakıt basıncı yüksek", ...lpgCause],
+        acts: ["Oksijen sensörünü kontrol ettirin", "Enjektör testi yaptırın", "Tüketim artışını izleyin"],
+        when: "Önümüzdeki ay"
+      });
+      else drop("trim");
+    }
+    if (Math.abs(lt) > 22) put({
+      id: "ltft",
+      sys: "karisim",
+      sev: "crit",
+      title: "Motor beyni karışımı düzeltemiyor",
+      ev: "Uzun yakıt ayarı %".concat(fmt(lt, 0), " (sınır ±%25)"),
+      causes: ["Büyük vakum kaçağı veya yakıt beslemesi sorunu"],
+      acts: ["Arıza kodlarını okuyun", "Yakında arıza lambası yanabilir, servise gidin"],
+      when: "Bu hafta"
+    });
+    else drop("ltft");
+  } else {
+    drop("trim");
+    drop("ltft");
+  }
+  R.idle = R.idle || [];
+  if (warmIdle) {
+    R.idle.push(rpm);
+    if (R.idle.length > 40) R.idle.shift();
+  } else if (spd > 5) R.idle = [];
+  if (R.idle.length >= 25) {
+    const s = stats(R.idle), lim2 = dz ? 30 : 45;
+    if (s.sd > lim2) put({
+      id: "idle",
+      sys: "atesleme",
+      sev: "warn",
+      title: "Rölanti dengesiz: tekleme olası",
+      ev: "Rölantide devir ".concat(fmt(s.m), " ± ").concat(fmt(s.sd), " d/dk (normal ±").concat(dz ? 15 : 25, ")"),
+      causes: dz ? ["Enjektör sorunu", "Kızdırma bujisi (soğukta)", "Motor takozları", "EGR valfi kirli"] : ["Buji veya bobin zayıf", "Gaz kelebeği kirli", "Vakum kaçağı", "Motor takozları"],
+      acts: dz ? ["Enjektör geri dönüş testi yaptırın", "EGR temizliği"] : ["Bujileri kontrol edin / değiştirin", "Gaz kelebeğini temizletin", "Arıza kodlarında P030x var mı bakın"],
+      when: "Önümüzdeki 2 hafta"
+    });
+    else if (s.m > 1050) put({
+      id: "idle",
+      sys: "atesleme",
+      sev: "info",
+      title: "Sıcak motorda rölanti yüksek",
+      ev: "Rölanti ".concat(fmt(s.m), " d/dk"),
+      causes: ["Klima açık (normal)", "Rölanti ayar valfi / gaz kelebeği", "Vakum kaçağı"],
+      acts: ["Klima kapalıyken tekrar bakın", "Gaz kelebeğini temizletin"],
+      when: "Fırsat buldukça"
+    });
+    else drop("idle");
+  }
+  if (cool != null && cool < 60 && rpm > 3500) {
+    R.coldRev = (R.coldRev || 0) + 1;
+  }
+  if ((R.coldRev || 0) > 5) put({
+    id: "cold",
+    sys: "bakim",
+    sev: "info",
+    title: "Soğuk motorda yüksek devir",
+    ev: "Bu yolculukta motor 60 °C altındayken ".concat(R.coldRev, " sn 3500 d/dk üstüne çıktı"),
+    causes: ["Yağ henüz akışkan değilken motor yükleniyor"],
+    acts: ["Su sıcaklığı 60 °C olana kadar 3000 d/dk altında kalın", "Turbolu araçta ısınmadan tam gaz vermeyin"],
+    when: "Sürüş alışkanlığı"
+  });
+  const boost = V("boost"), load2 = (_f = V("load")) != null ? _f : 0, thr = (_g = V("thr")) != null ? _g : 0, iat = V("iat"), amb = V("amb");
+  if (SET.turbo && boost != null) {
+    const B = R.boost || (R.boost = { max: 0, n: 0 });
+    if (load2 > 85 && rpm > 2500 && thr > 70) {
+      B.max = Math.max(B.max, boost);
+      B.n++;
+    } else if (B.n > 0 && B.n < 3) {
+      B.n = 0;
+      B.max = 0;
+    }
+    if (B.n >= 4) {
+      if (B.max < SET.boost * 0.6) put({
+        id: "boost",
+        sys: "hava",
+        sev: "warn",
+        title: "Turbo basıncı düşük",
+        ev: "Tam gazda en fazla ".concat(fmt(B.max, 2), " bar (beklenen ~").concat(fmt(SET.boost, 1), " bar)"),
+        causes: ["Turbo hortumu / intercooler kaçağı", "Wastegate veya değişken kanat takılı", "Turbo aşınmış", "Hava filtresi tıkalı"],
+        acts: ["Turbo hortumlarında yağ izi ve çatlak arayın", "Hava filtresini kontrol edin", "Turbo basınç testi yaptırın"],
+        when: "Önümüzdeki 2 hafta"
+      });
+      else if (B.max > SET.boost + 0.6) put({ id: "boost", sys: "hava", sev: "warn", title: "Turbo basıncı fazla", ev: "Tam gazda ".concat(fmt(B.max, 2), " bar"), causes: ["Wastegate kapalı kalmış", "Basınç sensörü hatalı"], acts: ["Tam gazdan kaçının, servise gösterin"], when: "Bu hafta" });
+      else drop("boost");
+      B.n = 0;
+      B.max = 0;
+    }
+    if (iat != null && amb != null && hold("ic", spd > 80 && iat - amb > 30, 60)) put({
+      id: "ic",
+      sys: "hava",
+      sev: "info",
+      title: "Emme havası çok sıcak",
+      ev: "Emme ".concat(fmt(iat), " °C, dış hava ").concat(fmt(amb), " °C"),
+      causes: ["Intercooler dıştan kirli / tıkalı", "Intercooler hortumu kaçak"],
+      acts: ["Intercooler peteklerini temizletin"],
+      when: "Sonraki bakımda"
+    });
+  }
+  const baro = (_h = V("baro")) != null ? _h : 101, mp = V("map");
+  if (!SET.turbo && mp != null && hold("af", thr > 90 && rpm > 3e3 && mp < baro - 12, 3)) put({
+    id: "af",
+    sys: "hava",
+    sev: "info",
+    title: "Tam gazda emiş zorlanıyor",
+    ev: "Emme basıncı ".concat(fmt(mp), " kPa, atmosfer ").concat(fmt(baro), " kPa"),
+    causes: ["Hava filtresi tıkalı", "Gaz kelebeği tam açılmıyor"],
+    acts: ["Hava filtresini değiştirin"],
+    when: "Sonraki bakımda"
+  });
+  const maf = V("maf");
+  if (!dz && maf != null && warmIdle) {
+    const T = R.maf || (R.maf = {});
+    ema(T, "m", maf);
+    if (T.mN > 30) {
+      const exp = SET.disp * 2.2;
+      if (T.m < exp * 0.5) put({
+        id: "maf",
+        sys: "hava",
+        sev: "info",
+        title: "Hava akış sensörü düşük okuyor olabilir",
+        ev: "Rölantide ".concat(fmt(T.m, 1), " g/s (bu motor için beklenen ~").concat(fmt(exp, 1), " g/s)"),
+        causes: ["MAF sensörü kirli", "Sensörden sonra hava kaçağı"],
+        acts: ["MAF sensörünü özel spreyle temizleyin"],
+        when: "Fırsat buldukça"
+      });
+      else drop("maf");
+    }
+  }
+  const o2a = V("o2a"), o2b = V("o2b");
+  if (!dz && o2a != null && o2b != null) {
+    const C = R.cat || (R.cat = { a: [], b: [], n: 0 });
+    if (running && cool > 80 && spd > 50) {
+      C.a.push(o2a);
+      C.b.push(o2b);
+      C.n++;
+      if (C.n >= 60) {
+        const cross = (arr) => arr.reduce((c, x, i) => c + (i && (arr[i - 1] - 0.45) * (x - 0.45) < 0 ? 1 : 0), 0);
+        const ca = cross(C.a), cb = cross(C.b);
+        if (ca >= 10 && cb / ca > 0.7) put({
+          id: "cat",
+          sys: "egzoz",
+          sev: "warn",
+          title: "Katalizör verimi düşük olabilir",
+          ev: "Arka oksijen sensörü öndeki gibi dalgalanıyor (".concat(cb, "/").concat(ca, " geçiş)"),
+          causes: ["Katalizör yaşlanmış veya erimiş", "Arka oksijen sensörü hatalı", "Egzoz kaçağı"],
+          acts: ["P0420 kodu gelecek mi izleyin", "Önce karışım ve tekleme sorunlarını giderin (katalizörü bozar)", "Egzoz kaçağına baktırın"],
+          when: "Önümüzdeki ay"
+        });
+        else if (ca >= 10) drop("cat");
+        C.a = [];
+        C.b = [];
+        C.n = 0;
+      }
+    }
+  }
+  const dpfT = V("dpfT");
+  if (dz && dpfT != null) {
+    if (dpfT > 450) put({
+      id: "regen",
+      sys: "egzoz",
+      sev: "info",
+      title: "DPF temizliği (rejenerasyon) sürüyor",
+      ev: "DPF sıcaklığı ".concat(fmt(dpfT), " °C"),
+      causes: ["Partikül filtresi kendini yakarak temizliyor (normal)"],
+      acts: ["Motoru şimdi kapatmayın", "10–15 dk boyunca 2000 d/dk civarında sürmeye devam edin"],
+      when: "Şimdi"
+    });
+    else drop("regen");
+  }
+  const egr = V("egrE");
+  if (egr != null && hold("egr", running && Math.abs(egr) > 15, 30)) put({
+    id: "egr",
+    sys: "egzoz",
+    sev: "warn",
+    title: "EGR valfi istenen konuma gelmiyor",
+    ev: "EGR hatası %".concat(fmt(egr)),
+    causes: ["EGR valfi karbonla kirlenmiş", "EGR valfi motoru / sensörü arızalı"],
+    acts: ["EGR temizliği yaptırın", "Kısa yollar yerine ara sıra uzun yol yapın"],
+    when: "Önümüzdeki 2 hafta"
+  });
+  const tr = LEARN.trips.slice(-8);
+  if (tr.length >= 6) {
+    const short = tr.filter((x) => x.min < 12 || !x.warm).length;
+    if (dz && short >= 5) put({
+      id: "short",
+      sys: "egzoz",
+      sev: "warn",
+      title: "Kısa yolculuklar DPF'yi doldurabilir",
+      ev: "Son ".concat(tr.length, " yolculuğun ").concat(short, " tanesi 12 dk'dan kısa veya motor ısınmadan bitti"),
+      causes: ["Kısa yolda DPF kendini temizleyemiyor (rejenerasyon yarım kalıyor)"],
+      acts: ["Haftada bir 20–30 dk otoyolda 2000+ d/dk sürün", "DPF uyarı lambası yanarsa ertelemeyin"],
+      when: "Bu hafta"
+    });
+    else if (!dz && short >= 6) put({
+      id: "short",
+      sys: "bakim",
+      sev: "info",
+      title: "Yolculuklar çoğunlukla kısa",
+      ev: "Son ".concat(tr.length, " yolculuğun ").concat(short, " tanesi motor ısınmadan bitti"),
+      causes: ["Kısa yolda yağda nem ve yakıt birikir, akü tam dolmaz"],
+      acts: ["Ara sıra 30 dk+ yol yapın", "Yağ değişimini aralığın erken tarafında yaptırın"],
+      when: "Sürüş alışkanlığı"
+    });
+    else drop("short");
+  }
+  const d = S.dtc;
+  if (d.mil || d.stored.length) put({
+    id: "mil",
+    sys: "kod",
+    sev: d.mil ? "crit" : "warn",
+    title: d.mil ? "Motor arıza lambası yanıyor" : "Kayıtlı arıza kodu var",
+    ev: d.stored.length ? "Kodlar: ".concat(d.stored.join(", ")) : "".concat(d.count, " kod bildirildi"),
+    causes: d.stored.slice(0, 3).map((c) => c + ": " + dtcInfo(c).d),
+    acts: ["Arıza kodları sekmesinde ayrıntılara bakın", d.mil ? "Lamba yanıp sönüyorsa yavaşlayın: ciddi tekleme katalizörü bozar" : "Sorun giderilmeden kodu silmeyin"],
+    when: d.mil ? "Bu hafta" : "Önümüzdeki 2 hafta",
+    tab: "kodlar"
+  });
+  else drop("mil");
+  if (d.pending.length) put({
+    id: "pend",
+    sys: "kod",
+    sev: "warn",
+    title: "Erken uyarı: bekleyen kod",
+    ev: "Bekleyen: ".concat(d.pending.join(", "), " (lamba henüz yanmadı)"),
+    causes: d.pending.slice(0, 3).map((c) => c + ": " + dtcInfo(c).d),
+    acts: ["Arıza tekrarlanırsa lamba yanacak: şimdiden kontrol ettirin"],
+    when: "Önümüzdeki 2 hafta",
+    tab: "kodlar"
+  });
+  else drop("pend");
+  mntDiag();
+  if (amb != null) {
+    if (amb <= 3) put({ id: "ice", sys: "bakim", sev: "info", title: "Yolda buzlanma olabilir", ev: "Dış hava ".concat(fmt(amb), " °C"), causes: ["Köprü ve gölgeli yerlerde buz"], acts: ["Takip mesafesini artırın, ani fren ve direksiyondan kaçının"], when: "Şimdi" });
+    else if (amb > 5) drop("ice");
+  }
+  renderDiag();
+}
+function speak(t) {
+  try {
+    if (!SET.voice) return;
+    if (window.MGMNative) {
+      MGMNative.speak(t);
+      return;
+    }
+    if (!window.speechSynthesis) return;
+    const u = new SpeechSynthesisUtterance(t);
+    u.lang = "tr-TR";
+    speechSynthesis.speak(u);
+  } catch (e) {
+  }
+}
+const DTC = {
+  P0100: ["Hava akış (MAF) sensörü devresi", "MAF sensörü veya soketi", "Sensörü ve soketi kontrol edin"],
+  P0101: ["MAF sensörü ölçüm aralığı dışında", "Kirli MAF, hava kaçağı, tıkalı hava filtresi", "MAF'ı temizleyin, hava filtresini kontrol edin"],
+  P0102: ["MAF sensörü sinyali düşük", "Soket, kablo, sensör", "Soketi ve kabloyu kontrol edin"],
+  P0106: ["Emme basınç (MAP) sensörü aralık dışı", "MAP sensörü, vakum hortumu", "Hortumu ve sensörü kontrol edin"],
+  P0110: ["Emme havası sıcaklık sensörü devresi", "Sensör veya kablo", "Sensörü kontrol edin"],
+  P0115: ["Su sıcaklık sensörü devresi", "Sensör veya kablo", "Sensörü değiştirin"],
+  P0116: ["Su sıcaklık sensörü aralık dışı", "Sensör, termostat", "Sensörü ve termostatı kontrol edin"],
+  P0117: ["Su sıcaklık sensörü sinyali düşük", "Sensörde kısa devre", "Sensörü ve kabloyu kontrol edin"],
+  P0118: ["Su sıcaklık sensörü sinyali yüksek", "Sensör kopuk, soket gevşek", "Soketi ve sensörü kontrol edin"],
+  P0120: ["Gaz kelebeği konum sensörü devresi", "Sensör, gaz kelebeği gövdesi", "Gaz kelebeğini kontrol ettirin"],
+  P0121: ["Gaz kelebeği sensörü aralık dışı", "Aşınmış sensör, kirli kelebek", "Temizleyip adaptasyon yaptırın"],
+  P0128: ["Motor geç ısınıyor (termostat)", "Termostat açık kalmış", "Termostatı değiştirin"],
+  P0130: ["Oksijen sensörü 1 devresi", "Sensör veya ısıtıcı", "Sensörü kontrol edin"],
+  P0133: ["Oksijen sensörü 1 yavaş tepki", "Sensör yaşlanmış", "Ön oksijen sensörünü değiştirin"],
+  P0135: ["Oksijen sensörü 1 ısıtıcı devresi", "Isıtıcı yanmış, sigorta", "Sigortayı ve sensörü kontrol edin"],
+  P0136: ["Oksijen sensörü 2 devresi", "Arka sensör veya kablo", "Sensörü kontrol edin"],
+  P0141: ["Oksijen sensörü 2 ısıtıcı devresi", "Isıtıcı yanmış", "Arka oksijen sensörünü değiştirin"],
+  P0171: ["Karışım çok fakir (sıra 1)", "Vakum kaçağı, kirli MAF, zayıf yakıt pompası, LPG ayarı", "Vakum kaçağı aratın, MAF'ı temizleyin, yakıt basıncını ölçtürün"],
+  P0172: ["Karışım çok zengin (sıra 1)", "Damlatan enjektör, oksijen sensörü, yüksek yakıt basıncı", "Enjektörleri ve oksijen sensörünü kontrol ettirin"],
+  P0174: ["Karışım çok fakir (sıra 2)", "Vakum kaçağı, MAF, yakıt basıncı", "P0171 ile aynı kontroller"],
+  P0175: ["Karışım çok zengin (sıra 2)", "Enjektör, oksijen sensörü", "P0172 ile aynı kontroller"],
+  P0190: ["Yakıt rampa basınç sensörü devresi", "Sensör veya kablo (dizelde sık)", "Sensörü kontrol ettirin"],
+  P0201: ["1. silindir enjektör devresi", "Enjektör veya kablo", "Enjektörü test ettirin"],
+  P0234: ["Turbo aşırı basınç", "Wastegate / kanat takılı, basınç sensörü", "Turbo kontrolünü test ettirin"],
+  P0299: ["Turbo basıncı yetersiz", "Hortum kaçağı, wastegate, turbo aşınması", "Turbo hortumlarını ve intercooler'ı kontrol edin"],
+  P0300: ["Rastgele / çoklu silindir teklemesi", "Bujiler, bobinler, vakum kaçağı, yakıt", "Bujileri ve bobinleri kontrol edin; lamba yanıp sönüyorsa yavaşlayın"],
+  P0301: ["1. silindirde tekleme", "Buji, bobin, enjektör", "Bobini başka silindirle değiştirip arızanın yer değiştirip değiştirmediğine bakın"],
+  P0302: ["2. silindirde tekleme", "Buji, bobin, enjektör", "Bobin değiştirme testi yapın"],
+  P0303: ["3. silindirde tekleme", "Buji, bobin, enjektör", "Bobin değiştirme testi yapın"],
+  P0304: ["4. silindirde tekleme", "Buji, bobin, enjektör", "Bobin değiştirme testi yapın"],
+  P0325: ["Vuruntu sensörü devresi", "Sensör veya kablo", "Sensörü kontrol ettirin"],
+  P0335: ["Krank konum sensörü devresi", "Sensör, kablo (motor stop edebilir)", "Hemen kontrol ettirin"],
+  P0340: ["Eksantrik konum sensörü devresi", "Sensör, kablo, zamanlama", "Sensörü ve zamanlamayı kontrol ettirin"],
+  P0380: ["Kızdırma bujisi devresi", "Kızdırma bujisi veya rölesi", "Bujileri ölçtürün (soğukta zor çalışma yapar)"],
+  P0400: ["EGR akış arızası", "EGR valfi kirli / takılı", "EGR temizliği yaptırın"],
+  P0401: ["EGR akışı yetersiz", "EGR kanalı tıkalı", "EGR ve kanallarını temizletin"],
+  P0402: ["EGR akışı fazla", "EGR valfi açık kalmış", "EGR valfini kontrol ettirin"],
+  P0403: ["EGR kontrol devresi", "Valf motoru veya kablo", "Soketi ve valfi kontrol edin"],
+  P0420: ["Katalizör verimi düşük (sıra 1)", "Katalizör yaşlanmış, arka oksijen sensörü, egzoz kaçağı", "Önce tekleme ve karışım sorunlarını giderin, sonra katalizörü test ettirin"],
+  P0430: ["Katalizör verimi düşük (sıra 2)", "Katalizör, oksijen sensörü", "P0420 ile aynı"],
+  P0440: ["Yakıt buharı (EVAP) sistemi", "Depo kapağı, hortum", "Depo kapağını sıkıca kapatın"],
+  P0442: ["EVAP sisteminde küçük kaçak", "Depo kapağı contası, hortum", "Depo kapağını değiştirin"],
+  P0455: ["EVAP sisteminde büyük kaçak", "Depo kapağı açık, hortum kopuk", "Kapağı ve hortumları kontrol edin"],
+  P0456: ["EVAP sisteminde çok küçük kaçak", "Kapak contası, kanister", "Duman testi yaptırın"],
+  P0480: ["Radyatör fanı 1 kontrol devresi", "Fan rölesi, sigorta, fan motoru", "Fanı ve rölesini kontrol edin"],
+  P0500: ["Araç hız sensörü", "Sensör veya kablo", "Sensörü kontrol ettirin"],
+  P0505: ["Rölanti kontrol sistemi", "Kirli gaz kelebeği, rölanti valfi", "Gaz kelebeğini temizletin"],
+  P0506: ["Rölanti beklenenden düşük", "Kirli gaz kelebeği", "Temizlik + adaptasyon"],
+  P0507: ["Rölanti beklenenden yüksek", "Vakum kaçağı, gaz kelebeği", "Kaçak aratın, kelebeği temizletin"],
+  P0560: ["Sistem voltajı arızası", "Akü, şarj dinamosu", "Akü ve şarj testini yaptırın"],
+  P0562: ["Sistem voltajı düşük", "Zayıf akü, şarj dinamosu", "Akü ve şarj sistemini test ettirin"],
+  P0563: ["Sistem voltajı yüksek", "Voltaj regülatörü", "Şarj sistemini kontrol ettirin"],
+  P0571: ["Fren müşürü devresi", "Fren lambası müşürü", "Müşürü kontrol edin"],
+  P0600: ["Motor beyni iletişim hatası", "ECU, kablo, akü voltajı", "Önce aküyü kontrol edin, sonra servise gidin"],
+  P0700: ["Şanzıman kontrol sisteminde arıza", "Şanzıman beyni kod kaydetti", "Şanzıman beynindeki kodları okutun"],
+  P0705: ["Vites konum sensörü", "Sensör, ayar", "Sensörü kontrol ettirin"],
+  P0715: ["Şanzıman giriş hız sensörü", "Sensör, kablo", "Sensörü kontrol ettirin"],
+  P0730: ["Yanlış vites oranı", "Şanzıman yağı, kavrama", "Şanzıman yağını kontrol ettirin"],
+  P2002: ["DPF verimi düşük", "Partikül filtresi hasarlı / dolu", "DPF ve fark basınç sensörünü kontrol ettirin"],
+  P2263: ["Turbo basınç sistemi performansı", "Hortum kaçağı, turbo, vakum valfi", "Turbo hortumlarını ve vakum kontrolünü test ettirin"],
+  P242F: ["DPF'de kül birikmesi", "Kül sınırına ulaşıldı", "DPF temizliği veya değişimi"],
+  P2463: ["DPF'de is birikmesi", "Kısa yollar, rejenerasyon yapılamıyor", "Uzun yol yapın, gerekirse servis rejenerasyonu"],
+  P0087: ["Yakıt rampa basıncı çok düşük", "Yakıt filtresi tıkalı, yüksek basınç pompası", "Yakıt filtresini değiştirin, basıncı ölçtürün"],
+  P0088: ["Yakıt rampa basıncı çok yüksek", "Basınç regülatörü", "Regülatörü kontrol ettirin"],
+  P0089: ["Yakıt basınç regülatörü performansı", "Regülatör, pompa", "Yakıt sistemini test ettirin"],
+  P0016: ["Krank–eksantrik zamanlaması uyumsuz", "Zincir/kayış uzaması, değişken supap", "Zamanlamayı acilen kontrol ettirin"],
+  P0011: ["Eksantrik zamanlaması fazla avanslı (sıra 1)", "Değişken supap solenoidi, yağ seviyesi", "Yağ seviyesini kontrol edin, solenoidi test ettirin"],
+  P0014: ["Egzoz eksantrik zamanlaması (sıra 1)", "Değişken supap solenoidi", "Solenoidi ve yağı kontrol edin"],
+  P0030: ["Oksijen sensörü 1 ısıtıcı kontrol devresi", "Isıtıcı, kablo", "Sensörü kontrol edin"],
+  P0036: ["Oksijen sensörü 2 ısıtıcı kontrol devresi", "Isıtıcı, kablo", "Sensörü kontrol edin"],
+  P0068: ["MAP / MAF uyumsuz", "Hava kaçağı, sensörler", "Emme hattında kaçak aratın"],
+  P0113: ["Emme havası sıcaklık sinyali yüksek", "Sensör kopuk", "Soketi kontrol edin"],
+  P0122: ["Gaz kelebeği sensörü sinyali düşük", "Sensör, kablo", "Sensörü kontrol ettirin"],
+  P0219: ["Motor aşırı devir", "Fazla devir yapıldı", "Kayıt bilgisi; tekrarlarsa kontrol ettirin"],
+  U0100: ["Motor beyni ile iletişim kayboldu", "CAN hattı, soket, akü voltajı", "Akü voltajını ve CAN bağlantılarını kontrol ettirin"],
+  U0101: ["Şanzıman beyni ile iletişim kayboldu", "CAN hattı, soket", "Bağlantıları kontrol ettirin"],
+  U0121: ["ABS beyni ile iletişim kayboldu", "ABS beyni, soket", "ABS sistemini kontrol ettirin"],
+  U0155: ["Gösterge paneli ile iletişim kayboldu", "Gösterge, CAN hattı", "Bağlantıları kontrol ettirin"],
+  C0035: ["Sol ön tekerlek hız sensörü", "Sensör, kablo, ABS halkası", "ABS sensörünü kontrol ettirin"],
+  C0040: ["Sağ ön tekerlek hız sensörü", "Sensör, kablo", "ABS sensörünü kontrol ettirin"],
+  B0001: ["Sürücü hava yastığı devresi", "Saat yayı, soket", "Hava yastığı sistemini servise kontrol ettirin"]
+};
+const SUBSYS = { "0": "Yakıt ve hava ölçümü / emisyon", "1": "Yakıt ve hava ölçümü", "2": "Yakıt ve hava ölçümü (enjektör)", "3": "Ateşleme sistemi veya tekleme", "4": "Emisyon kontrolü", "5": "Hız / rölanti kontrolü", "6": "Motor beyni ve çıkışları", "7": "Şanzıman", "8": "Şanzıman", "9": "Şanzıman", A: "Hibrit sistem", B: "Hibrit sistem", C: "Hibrit sistem" };
+function dtcInfo(c) {
+  const e = DTC[c];
+  if (e && e[0]) return { d: e[0], c: e[1], a: e[2], known: true };
+  const sys = { P: "Motor / şanzıman", C: "Şasi (ABS, direksiyon)", B: "Gövde (hava yastığı, klima, kapılar)", U: "Haberleşme ağı" }[c[0]] || "";
+  const gen = c[1] === "0" || c[1] === "2" ? "standart kod" : "üreticiye özel kod";
+  const sub = c[0] === "P" ? SUBSYS[c[2]] || "" : "";
+  return { d: "".concat(sys).concat(sub ? ": " + sub : "", " (").concat(gen, ")"), c: "Ayrıntı için aracın marka/model arıza kataloğuna bakın", a: "Kodu not alıp servise gösterin", known: false };
+}
+const DEMO_FLAGS = [
+  { k: "vac", name: "Vakum kaçağı (rölantide fakir)", on: true },
+  { k: "batt", name: "Zayıf akü", on: true },
+  { k: "thermo", name: "Termostat açık kalmış", on: false },
+  { k: "turbo", name: "Turbo hortumu kaçak (turbo seçiliyse)", on: false },
+  { k: "cat", name: "Katalizör verimi düşük", on: false },
+  { k: "misfire", name: "Rölantide tekleme", on: false }
+];
+let demoTimer = 0, demoT0 = 0, demoDiag = 0;
+const DF = () => Object.fromEntries(DEMO_FLAGS.map((f) => [f.k, f.on]));
+function startDemo() {
+  if (S.mode === "on") Elm.disconnect();
+  stopDemo();
+  LEARN = structuredClone(DEF_LEARN);
+  const f = DF(), base = now() - 9 * 864e5;
+  LEARN.crank = [10.6, 10.5, 10.4, 10.2, 10.1, 9.9].map((m, i) => ({ t: base + i * 864e5, min: f.batt ? m : 10.7 + i % 2 * 0.05, rest: f.batt ? 12.15 : 12.55 }));
+  LEARN.warm = [9, 10, 8, 11].map((m, i) => ({ t: base + i * 2 * 864e5, min: f.thermo ? m + 12 : m, spd: 38 }));
+  LEARN.trips = [];
+  for (let i = 0; i < 40; i++) {
+    const m = [8, 22, 6, 35, 9, 14, 7, 41][i % 8], km = +(m * 0.62).toFixed(1), L = +(km * (6.4 + i % 5 * 0.4) / 100).toFixed(2);
+    LEARN.trips.push({ t: now() - (40 - i) * 4.4 * 864e5, min: m, km, L, warm: m > 10, avg: +(L / km * 100).toFixed(1), cost: SET.price > 0 ? +(L * SET.price).toFixed(2) : null, maxSpd: 60 + i * 7 % 60, score: 62 + i * 13 % 37, tips: i % 3 ? "Temiz sürüş" : "2 sert fren" });
+  }
+  S.ready = [f.vac ? 129 : 0, 7, 229, f.cat ? 33 : 0];
+  S.freeze = f.vac ? { at: now(), code: "P0171", vals: [["Motor yükü", 22, "%", 0], ["Su sıcaklığı", 88, "°C", 0], ["Devir", 812, "d/dk", 0], ["Hız", 0, "km/sa", 0], ["Kısa yakıt ayarı", 9.4, "%", 1], ["Uzun yakıt ayarı", 15.6, "%", 1], ["Emme basıncı", 33, "kPa", 0], ["Emme havası", 24, "°C", 0], ["Gaz pedalı", 0, "%", 0]] } : null;
+  LEARN.coolN = 400;
+  LEARN.coolSum = 400 * 90;
+  LEARN.km = 0;
+  S.sup = new Set(PIDS.map((p) => p.pid));
+  S.isCan = true;
+  S.diesel = SET.fuel === "dizel";
+  S.v = {};
+  S.hist = {};
+  F.clear();
+  for (const k in R) delete R[k];
+  for (const k in holdT) delete holdT[k];
+  S.dtc = { read: false, mil: false, count: 0, stored: [], pending: [], perm: [] };
+  setMode("demo", "Demo sürüş");
+  resetTrip();
+  demoT0 = now();
+  demoDtc();
+  demoTimer = setInterval(demoStep, 200);
+  demoDiag = setInterval(diagTick, 1e3);
+  diagTick();
+}
+function stopDemo() {
+  clearInterval(demoTimer);
+  clearInterval(demoDiag);
+  demoTimer = demoDiag = 0;
+  if (LEARN !== REAL_LEARN) LEARN = REAL_LEARN;
+}
+function demoDtc() {
+  const f = DF();
+  S.dtc.stored = f.vac ? ["P0171"] : [];
+  S.dtc.pending = [...f.batt ? ["P0562"] : [], ...f.cat ? ["P0420"] : []];
+  S.dtc.perm = [];
+  S.dtc.mil = S.dtc.stored.length > 0;
+  S.dtc.count = S.dtc.stored.length;
+  S.dtc.read = true;
+  S.dtc.at = now();
+  renderDtc();
+}
+function demoStep() {
+  var _a, _b, _c, _d;
+  const f = DF(), t = (now() - demoT0) / 1e3, lt = t % 180, first = t < 180, dz = effFuel() === "dizel";
+  const nz = (a) => (Math.random() - 0.5) * 2 * a;
+  let spd = 0, rpm = 0, thr = 0;
+  const seg = (a, b) => lt >= a && lt < b;
+  const ramp = (a, b, x, y) => x + (y - x) * clamp((lt - a) / (b - a), 0, 1);
+  if (first && lt < 2) {
+    rpm = 0;
+  } else if (first && lt < 3.4) {
+    rpm = 180 + nz(40);
+  } else if (seg(0, 25)) {
+    rpm = 0;
+  } else if (seg(25, 35)) {
+    spd = ramp(25, 35, 0, 50);
+    thr = 35;
+  } else if (seg(35, 70)) {
+    spd = 42 + 10 * Math.sin(lt / 4);
+    thr = 18 + nz(4);
+  } else if (seg(70, 80)) {
+    spd = ramp(70, 74, 40, 0);
+    thr = 0;
+  } else if (seg(80, 95)) {
+    spd = ramp(80, 95, 0, 100);
+    thr = 55;
+  } else if (seg(95, 150)) {
+    spd = 104 + 4 * Math.sin(lt / 6);
+    thr = 24 + nz(3);
+    if (seg(120, 128)) {
+      spd = ramp(120, 128, 104, 128);
+      thr = 98;
+    }
+  } else if (seg(150, 170)) {
+    spd = ramp(150, 170, 108, 0);
+    thr = 0;
+  }
+  const idleRpm = dz ? 820 : 790;
+  if (!(first && lt < 3.4)) {
+    if (spd < 2 && (!first || lt >= 3.4)) rpm = idleRpm + nz(f.misfire ? 90 : 12) + (lt > 3.4 && lt < 8 && first ? 300 : 0);
+    else if (spd >= 2) {
+      const g = spd < 18 ? 9.5 : spd < 32 ? 5.6 : spd < 50 ? 3.9 : spd < 72 ? 3 : 2.45;
+      rpm = Math.max(idleRpm, spd * g * 10.2 + thr * 6 + nz(15));
+    }
+  }
+  const load2 = rpm < 100 ? 0 : clamp(18 + thr * 0.85 + nz(3), 10, 100);
+  setV("rpm", rpm);
+  setV("speed", spd);
+  setV("thr", thr);
+  setV("load", load2);
+  let bv;
+  if (rpm < 50) bv = f.batt ? 12.15 : 12.55;
+  else if (rpm < 450) bv = f.batt ? 9.4 + nz(0.1) : 10.6 + nz(0.1);
+  else bv = (f.batt ? 13.9 : 14.2) + nz(0.05);
+  setV("batt", bv);
+  setV("ecuV", bv - 0.2);
+  const prevCool = (_a = S.v.cool) != null ? _a : 84;
+  let target = 90;
+  if (f.thermo && spd > 70) target = 70;
+  setV("cool", prevCool + (target - prevCool) * 0.01 + nz(0.05));
+  setV("oil", ((_b = S.v.oil) != null ? _b : 86) + (((_c = S.v.cool) != null ? _c : 88) + 4 - ((_d = S.v.oil) != null ? _d : 86)) * 0.01);
+  setV("amb", 9);
+  setV("baro", 100);
+  setV("iat", 9 + 14 + (spd < 5 ? 10 : 0) + nz(0.3));
+  let mp;
+  if (rpm < 100) mp = 100;
+  else if (SET.turbo) {
+    const maxB = f.turbo ? 0.32 : SET.boost;
+    mp = 100 + clamp((thr - 30) / 70, 0, 1) * maxB * 100 * clamp((rpm - 1500) / 1500, 0, 1) - (thr < 20 ? 55 : 0) + nz(2);
+  } else mp = 30 + thr * 0.7 + nz(1.5);
+  setV("map", mp);
+  const maf = rpm < 100 ? 0 : SET.disp * 2.2 * (rpm / 800) * (mp / 32) * 0.9 + nz(0.2);
+  setV("maf", maf);
+  const idle = spd < 2 && rpm > 450;
+  let stft = nz(3), ltft = 2 + nz(0.5);
+  if (f.vac) {
+    if (idle) {
+      stft = 6 + nz(3);
+      ltft = 9 + nz(0.4);
+    } else {
+      stft = 1 + nz(2);
+      ltft = 3.5;
+    }
+  }
+  if (!dz) {
+    setV("stft", stft);
+    setV("ltft", ltft);
+  }
+  setV("adv", idle ? 10 + nz(2) : 22 + nz(3));
+  if (!dz && rpm > 450) {
+    setV("o2a", 0.45 + 0.4 * Math.sin(t * 2.3));
+    setV("o2b", f.cat ? 0.45 + 0.35 * Math.sin(t * 2.3 + 0.4) : 0.66 + nz(0.02));
+  }
+  setV("fuel", 58 - t / 600);
+  if (dz) setV("dpfT", seg(130, 150) ? 520 + nz(10) : 240 + spd * 1.5);
+  setV("clrKm", 312);
+  derive();
+}
+function setMode(m, txt2) {
+  S.mode = m;
+  const p = $("connPill");
+  p.className = "pill " + (m === "on" ? "on" : m === "demo" ? "demo" : m === "busy" ? "busy" : "");
+  $("connTxt").textContent = txt2;
+  $("btnConnect").textContent = m === "on" ? "Bağlantıyı kes" : "ELM327'ye bağlan";
+  $("btnDemo").textContent = m === "demo" ? "Demoyu durdur" : "Demo";
+  if (m === "on" && !realDiag) realDiag = setInterval(diagTick, 1e3);
+  if (m === "on" || m === "demo") sweepAt = performance.now();
+  if (m !== "on" && realDiag) {
+    clearInterval(realDiag);
+    realDiag = 0;
+  }
+}
+let realDiag = 0, msgTimer = 0;
+function showMsg(t) {
+  const n = $("btNote");
+  n.innerHTML = "";
+  const s = document.createElement("span");
+  s.textContent = t;
+  n.appendChild(s);
+  n.hidden = false;
+  clearTimeout(msgTimer);
+  msgTimer = setTimeout(() => {
+    if (!btUnsupported) n.hidden = true;
+    else showBtNote(false);
+  }, 5e3);
+}
+let btUnsupported = false;
+let framedView = false;
+function showBtNote(focus) {
+  const n = $("btNote");
+  n.innerHTML = framedView ? "<span><strong>Önizleme:</strong> burada Bluetooth kullanılamaz, demo sürüş gösteriliyor ve değerler örnektir. Araçta kullanmak için sayfayı iPhone'da <strong>Bluefy</strong>, Android'de <strong>Chrome</strong> ile açın.</span>" : "<span><strong>Bu tarayıcı Bluetooth'a erişemiyor.</strong> iPhone'da <strong>Bluefy</strong> tarayıcısını, Android'de <strong>Chrome</strong>'u kullanın. Şu an demo sürüş gösteriliyor; değerler örnektir.</span>";
+  n.hidden = false;
+  btUnsupported = true;
+  if (focus) n.scrollIntoView({ block: "nearest" });
+}
+const VIEWS = ["kokpit", "teshis", "kodlar", "yolculuk", "perf", "bakim", "canli", "ayar"];
+function showView(v) {
+  for (const t of document.querySelectorAll(".tab")) t.setAttribute("aria-selected", t.dataset.v === v ? "true" : "false");
+  for (const x of VIEWS) $("v-" + x).hidden = x !== v;
+  try {
+    localStorage.setItem("mgmk.tab", v);
+  } catch (e) {
+  }
+  if (v === "ayar") {
+    $("log").textContent = LOG.slice(-60).join("\n");
+  }
+  if (v === "teshis") renderDiag(true);
+  if (v === "canli") buildLive();
+  if (v === "yolculuk") renderTrips();
+  if (v === "perf") {
+    renderPerf();
+    renderGps();
+  }
+  if (v === "bakim") renderMnt();
+  if (v === "kodlar") {
+    renderReady();
+    renderFreeze();
+  }
+  resizeDial();
+  resizeCluster();
+}
+document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => showView(t.dataset.v)));
+$("healthChip").addEventListener("click", () => showView("teshis"));
+const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const dialCv = $("dialCv"), dctx = dialCv.getContext("2d");
+let dialW = 0, dialH = 0, shownRpm = 0, shownSpd = 0;
+function resizeDial() {
+  const r = dialCv.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
+  if (!r.width) return;
+  dialW = r.width;
+  dialH = r.height;
+  dialCv.width = r.width * dpr;
+  dialCv.height = r.height * dpr;
+  dctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener("resize", resizeDial);
+function drawDial() {
+  if (!dialW) return;
+  const c = dctx, w = dialW, h = dialH, cx = w / 2, cy = h * 0.56, R0 = Math.min(w * 0.46, h * 0.5);
+  const dz = effFuel() === "dizel", max = dz ? 5e3 : 7e3, red = dz ? 4300 : 6e3;
+  const a0 = Math.PI * 0.78, a1 = Math.PI * 2.22, ang = (r) => a0 + (a1 - a0) * clamp(r / max, 0, 1);
+  c.clearRect(0, 0, w, h);
+  c.lineCap = "butt";
+  c.lineWidth = Math.max(10, R0 * 0.07);
+  c.strokeStyle = css("--panel2");
+  c.beginPath();
+  c.arc(cx, cy, R0, a0, a1);
+  c.stroke();
+  c.strokeStyle = "rgba(242,84,91,.35)";
+  c.beginPath();
+  c.arc(cx, cy, R0, ang(red), a1);
+  c.stroke();
+  const g = c.createLinearGradient(cx - R0, 0, cx + R0, 0);
+  g.addColorStop(0, "rgba(92,200,255,.35)");
+  g.addColorStop(0.75, css("--accent"));
+  g.addColorStop(1, css("--crit"));
+  c.strokeStyle = shownRpm >= red ? css("--crit") : g;
+  c.beginPath();
+  c.arc(cx, cy, R0, a0, ang(shownRpm));
+  c.stroke();
+  c.fillStyle = css("--muted");
+  c.font = "600 ".concat(Math.max(11, R0 * 0.075), "px ").concat(css("--f-num"));
+  c.textAlign = "center";
+  c.textBaseline = "middle";
+  for (let r = 0; r <= max; r += 500) {
+    const a2 = ang(r), major = r % 1e3 === 0, r1 = R0 - c.lineWidth * 0.9, r2 = r1 - (major ? R0 * 0.08 : R0 * 0.04);
+    c.strokeStyle = r >= red ? css("--crit") : css("--dim");
+    c.lineWidth = major ? 2 : 1;
+    c.beginPath();
+    c.moveTo(cx + Math.cos(a2) * r1, cy + Math.sin(a2) * r1);
+    c.lineTo(cx + Math.cos(a2) * r2, cy + Math.sin(a2) * r2);
+    c.stroke();
+    if (major) {
+      const rt = r2 - R0 * 0.08;
+      c.fillText(String(r / 1e3), cx + Math.cos(a2) * rt, cy + Math.sin(a2) * rt);
+    }
+    c.lineWidth = Math.max(10, R0 * 0.07);
+  }
+  const a = ang(shownRpm), rr2 = R0;
+  c.fillStyle = css("--fg");
+  c.beginPath();
+  c.arc(cx + Math.cos(a) * rr2, cy + Math.sin(a) * rr2, Math.max(5, R0 * 0.03), 0, Math.PI * 2);
+  c.fill();
+  c.fillStyle = css("--dim");
+  c.font = "500 ".concat(Math.max(10, R0 * 0.06), "px ").concat(css("--f-ui"));
+  c.fillText("x1000 d/dk", cx, cy + R0 * 0.62);
+}
+function setBar(id, frac, col) {
+  const e = $(id);
+  e.style.width = (clamp(frac, 0, 1) * 100).toFixed(1) + "%";
+  if (col) e.style.background = col;
+}
+function setVal(id, v, d, unit) {
+  $(id).innerHTML = (v == null ? "--" : fmt(v, d)) + (unit ? "<small>".concat(unit, "</small>") : "");
+}
+function frame(ts) {
+  var _a, _b;
+  const rpm = (_a = V("rpm")) != null ? _a : 0, spd = (_b = V("speed")) != null ? _b : 0;
+  shownRpm += (rpm - shownRpm) * 0.25;
+  shownSpd += (spd - shownSpd) * 0.3;
+  if (!$("v-kokpit").hidden && THEME !== "temel") drawCluster(ts || 0);
+  else if (!$("v-kokpit").hidden) {
+    drawDial();
+    $("kSpeed").textContent = Math.round(shownSpd);
+    $("kRpm").textContent = Math.round(rpm / 10) * 10 + " d/dk";
+    $("kL100").textContent = V("l100") != null && spd > 3 ? fmt(V("l100"), 1) : "--";
+    $("kLph").textContent = fmt(V("lph"), 1);
+  }
+  requestAnimationFrame(frame);
+}
+function renderCockpit() {
+  var _a, _b, _c, _d, _e, _f, _g;
+  const cool = V("cool"), norm = LEARN.coolN > 60 ? LEARN.coolSum / LEARN.coolN : null;
+  setVal("kCool", cool, 0, "°C");
+  setBar("bCool", cool == null ? 0 : (cool - 40) / 90, cool >= 105 ? css("--crit") : cool >= 98 ? css("--warn") : cool < 70 ? css("--info") : css("--ok"));
+  const m = $("mCool");
+  if (norm) {
+    m.hidden = false;
+    m.style.left = clamp((norm - 40) / 90, 0, 1) * 100 + "%";
+    $("coolNorm").textContent = "normal " + fmt(norm) + "°";
+  } else {
+    m.hidden = true;
+    $("coolNorm").textContent = "";
+  }
+  setVal("kOil", V("oil"), 0, "°C");
+  setVal("kIat", V("iat"), 0, "°C");
+  $("kAmb").textContent = V("amb") != null ? "dış " + fmt(V("amb")) + "°" : "";
+  setVal("kLoad", V("load"), 0, "%");
+  setBar("bLoad", ((_a = V("load")) != null ? _a : 0) / 100);
+  const b = (_b = V("batt")) != null ? _b : V("ecuV");
+  setVal("kBatt", b, 1, "V");
+  $("kVsrc").textContent = V("batt") != null ? "adaptör" : V("ecuV") != null ? "ECU" : "";
+  const run = ((_c = V("rpm")) != null ? _c : 0) > 450;
+  setBar("bBatt", b == null ? 0 : (b - 11) / 4, b == null ? null : run ? b < 13.2 || b > 14.9 ? css("--warn") : css("--ok") : b < 12.2 ? css("--warn") : css("--ok"));
+  setVal("kFuel", V("fuel"), 0, "%");
+  setBar("bFuel", ((_d = V("fuel")) != null ? _d : 0) / 100, ((_e = V("fuel")) != null ? _e : 100) < 12 ? css("--warn") : null);
+  if (SET.turbo && V("boost") != null) {
+    $("kBoostL").textContent = "Turbo basıncı";
+    setVal("kBoost", V("boost"), 2, "bar");
+    setBar("bBoost", (V("boost") + 0.8) / (SET.boost + 1.2));
+  } else {
+    $("kBoostL").textContent = "Emme basıncı";
+    setVal("kBoost", V("map"), 0, "kPa");
+    setBar("bBoost", ((_f = V("map")) != null ? _f : 0) / 110);
+  }
+  setVal("kThr", V("thr"), 0, "%");
+  setBar("bThr", ((_g = V("thr")) != null ? _g : 0) / 100);
+  const tr = S.trip;
+  setVal("tKm", tr.km, 1, "km");
+  const mm = Math.floor(tr.sec / 60);
+  $("tTime").textContent = Math.floor(mm / 60) + ":" + String(mm % 60).padStart(2, "0");
+  setVal("tAvg", tr.km > 0.3 && tr.L > 0 ? tr.L / tr.km * 100 : null, 1, "L/100");
+  setVal("tFuel", tr.L, 2, "L");
+  renderLamps();
+}
+const ICONS = {
+  engine: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 10h2V8h3V6h6v2h2l2 2h1v6h-1l-2 2H9l-3-2H4z"/><path d="M2 11v4"/></svg>',
+  temp: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v11"/><circle cx="12" cy="17" r="3"/><path d="M15 6h3M15 9h3M4 21c2-1 3-1 4 0s3 1 4 0 3-1 4 0 3 1 4 0"/></svg>',
+  batt: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="7" width="18" height="12" rx="1.5"/><path d="M7 7V5h3v2M14 7V5h3v2M6.5 13h3M15 13h3M16.5 11.5v3"/></svg>',
+  dpf: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="7" width="14" height="10" rx="5"/><path d="M2 12h3M19 12h3"/><circle cx="10" cy="11" r=".8" fill="currentColor"/><circle cx="13" cy="13" r=".8" fill="currentColor"/><circle cx="14" cy="10" r=".8" fill="currentColor"/></svg>',
+  svc: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M14.5 5.5a4 4 0 0 0 4.9 4.9L12 18l-3.5 1 1-3.5L17 8"/><path d="M4 20l3-3"/></svg>',
+  ice: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9M9.5 4.5 12 7l2.5-2.5M9.5 19.5 12 17l2.5 2.5"/></svg>',
+  turbo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><path d="M12 12c0-4 3-5 5-4M12 12c-3.5 2-6 0-6-2M12 12c1 3.8-1.5 5.5-3.5 5"/></svg>'
+};
+function renderLamps() {
+  const RANK = { info: 1, warn: 2, crit: 3 }, CLS = ["", "i", "w", "c"];
+  const sevOf = (...ids) => CLS[Math.max(0, ...ids.map((id) => F.get(id) ? RANK[F.get(id).sev] : 0))];
+  const L = [
+    ["engine", "Motor arıza lambası", S.dtc.mil ? "c" : sevOf("pend", "trim", "ltft", "idle")],
+    ["temp", "Motor sıcaklığı", sevOf("hot", "fan", "thermo", "oil")],
+    ["batt", "Akü ve şarj", sevOf("crank", "chg", "rest")],
+    ["turbo", "Turbo ve emiş", sevOf("boost", "ic", "af", "maf")],
+    ["dpf", "Egzoz, katalizör, DPF", sevOf("cat", "regen", "egr", "short")],
+    ["svc", "Bakım", sevOf("svc", "cold")],
+    ["ice", "Buzlanma", F.has("ice") ? "i" : ""]
+  ];
+  $("lamps").innerHTML = L.map(([ic, t, s]) => '<span class="lamp '.concat(s, '" title="').concat(t, '" role="img" aria-label="').concat(t).concat(s ? ": uyarı" : "", '">').concat(ICONS[ic], "</span>")).join("");
+}
+const THEMES = [
+  { k: "temel", name: "Temel" },
+  { k: "luks", name: "Lüks", font: "Jost", draw: (c, w, h, D) => drawLuks(c, w, h, D) },
+  { k: "sport", name: "Sport", font: "Saira", draw: (c, w, h, D) => drawSport(c, w, h, D) },
+  { k: "matris", name: "Matris", font: "Exo 2", draw: (c, w, h, D) => drawMatris(c, w, h, D) },
+  { k: "bakir", name: "Bakır", font: "Rajdhani", draw: (c, w, h, D) => drawBakir(c, w, h, D) },
+  { k: "pist", name: "Pist", font: "Chakra Petch", draw: (c, w, h, D) => drawPist(c, w, h, D) },
+  { k: "klasik", name: "Klasik", font: "Oswald", draw: (c, w, h, D) => drawKlasik(c, w, h, D) },
+  { k: "retro", name: "Retro", font: "Orbitron", draw: (c, w, h, D) => drawRetro(c, w, h, D) },
+  { k: "verim", name: "Verim", font: "Jost", draw: (c, w, h, D) => drawVerim(c, w, h, D) },
+  { k: "hud", name: "HUD", font: "Barlow Condensed", draw: (c, w, h, D) => drawHud(c, w, h, D) },
+  { k: "gece", name: "Gece", font: "Barlow Condensed", draw: (c, w, h, D) => drawGece(c, w, h, D) }
+];
+const TAU = Math.PI * 2;
+const PT = (cx, cy, r, a) => [cx + Math.cos(a) * r, cy + Math.sin(a) * r];
+const easeIO = (k) => k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+function arcS(c, cx, cy, r, a0, a1, lw, st, cap = "butt") {
+  c.beginPath();
+  c.arc(cx, cy, r, a0, a1);
+  c.lineWidth = lw;
+  c.strokeStyle = st;
+  c.lineCap = cap;
+  c.stroke();
+}
+function txt(c, s, x, y, font, col, al = "center", bl = "middle") {
+  c.font = font;
+  c.fillStyle = col;
+  c.textAlign = al;
+  c.textBaseline = bl;
+  c.fillText(s, x, y);
+}
+function spaced(c, s, x, y, font, col, sp, al = "center") {
+  c.font = font;
+  c.fillStyle = col;
+  c.textBaseline = "middle";
+  c.textAlign = "left";
+  const chars = [...s], wTot = chars.reduce((a, ch) => a + c.measureText(ch).width, 0) + sp * (chars.length - 1);
+  let xx = al === "center" ? x - wTot / 2 : al === "right" ? x - wTot : x;
+  for (const ch of chars) {
+    c.fillText(ch, xx, y);
+    xx += c.measureText(ch).width + sp;
+  }
+}
+function glow(c, col, b) {
+  c.shadowColor = col;
+  c.shadowBlur = b;
+}
+function noGlow(c) {
+  c.shadowBlur = 0;
+  c.shadowColor = "transparent";
+}
+const angOf = (a0, a1, v, max) => a0 + (a1 - a0) * clamp((v || 0) / max, 0, 1);
+const n0 = (v) => v == null ? "--" : String(Math.round(v));
+const n1 = (v) => v == null ? "--" : fmt(v, 1);
+function ticks(c, cx, cy, r, a0, a1, max, minor, major, o) {
+  for (let v = 0; v <= max + 1e-6; v += minor) {
+    const a = angOf(a0, a1, v, max), mj = Math.abs(v / major - Math.round(v / major)) < 1e-6, red = o.red != null && v >= o.red;
+    const len = mj ? o.lj : o.ln, [x1, y1] = PT(cx, cy, r, a), [x2, y2] = PT(cx, cy, r - len, a);
+    c.beginPath();
+    c.moveTo(x1, y1);
+    c.lineTo(x2, y2);
+    c.lineWidth = mj ? o.wj : o.wn;
+    c.strokeStyle = red ? o.redCol : mj ? o.cj : o.cn;
+    c.lineCap = "butt";
+    c.stroke();
+  }
+}
+function nums(c, cx, cy, r, a0, a1, max, step, font, col, o = {}) {
+  for (let v = 0; v <= max + 1e-6; v += step) {
+    const [x, y] = PT(cx, cy, r, angOf(a0, a1, v, max));
+    txt(c, o.f ? o.f(v) : String(v), x, y, font, o.red != null && v >= o.red ? o.redCol : col);
+  }
+}
+function rr(c, x, y, w, h, r) {
+  c.beginPath();
+  c.moveTo(x + r, y);
+  c.arcTo(x + w, y, x + w, y + h, r);
+  c.arcTo(x + w, y + h, x, y + h, r);
+  c.arcTo(x, y + h, x, y, r);
+  c.arcTo(x, y, x + w, y, r);
+  c.closePath();
+}
+function para(c, x, y, w, h, sk) {
+  c.beginPath();
+  c.moveTo(x + sk, y);
+  c.lineTo(x + w + sk, y);
+  c.lineTo(x + w, y + h);
+  c.lineTo(x, y + h);
+  c.closePath();
+}
+function warnBadge(c, x, y, D, col, font) {
+  if (!D.alerts) return;
+  const s = 9;
+  c.beginPath();
+  c.moveTo(x, y - s);
+  c.lineTo(x + s, y + s * 0.75);
+  c.lineTo(x - s, y + s * 0.75);
+  c.closePath();
+  c.fillStyle = D.crit ? "#ff4d5a" : "#f3b33d";
+  c.fill();
+  txt(c, "!", x, y + 1.5, "700 11px ".concat(font), "#111");
+  txt(c, D.alerts + (D.alerts > 1 ? " uyarı" : " uyarı"), x + s + 6, y, "500 12px ".concat(font), col, "left");
+}
+function clock(D) {
+  const d = /* @__PURE__ */ new Date();
+  return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+}
+function luxGauge(c, cx, cy, R2, val, max, major, minor, o) {
+  const a0 = Math.PI * 0.75, a1 = Math.PI * 2.25, va = angOf(a0, a1, val, max), hot = o.red != null && val >= o.red;
+  const acc = hot ? "255,77,109" : o.acc;
+  const g0 = c.createRadialGradient(cx, cy, R2 * 0.1, cx, cy, R2 * 1.05);
+  g0.addColorStop(0, "rgba(16,22,44,.95)");
+  g0.addColorStop(0.75, "rgba(6,8,18,.9)");
+  g0.addColorStop(1, "rgba(0,0,0,0)");
+  c.fillStyle = g0;
+  c.beginPath();
+  c.arc(cx, cy, R2 * 1.05, 0, TAU);
+  c.fill();
+  arcS(c, cx, cy, R2, 0, TAU, 1, "rgba(255,255,255,.10)");
+  arcS(c, cx, cy, R2 * 0.9, a0, a1, R2 * 0.05, "rgba(255,255,255,.04)");
+  if (val > 1e-3) {
+    if (c.createConicGradient) {
+      const g = c.createConicGradient(a0, cx, cy), f = (va - a0) / TAU;
+      g.addColorStop(0, "rgba(".concat(acc, ",0)"));
+      g.addColorStop(Math.max(1e-4, f * 0.98), "rgba(".concat(acc, ",.85)"));
+      g.addColorStop(Math.min(1, f + 2e-3), "rgba(".concat(acc, ",0)"));
+      g.addColorStop(1, "rgba(".concat(acc, ",0)"));
+      arcS(c, cx, cy, R2 * 0.9, a0, va, R2 * 0.05, g);
+    } else arcS(c, cx, cy, R2 * 0.9, a0, va, R2 * 0.05, "rgba(".concat(acc, ",.6)"));
+  }
+  ticks(c, cx, cy, R2 * 0.985, a0, a1, max, minor, major, { lj: R2 * 0.085, ln: R2 * 0.04, wj: 2, wn: 1, cj: "rgba(255,255,255,.85)", cn: "rgba(255,255,255,.28)", red: o.red, redCol: "rgba(255,77,109,.9)" });
+  nums(c, cx, cy, R2 * 0.74, a0, a1, max, major * (o.numEvery || 1), "300 ".concat(R2 * 0.11, "px Jost, ").concat(css("--f-ui")), "rgba(235,240,255,.82)", { red: o.red, redCol: "rgba(255,120,140,.95)", f: o.nf });
+  const [x1, y1] = PT(cx, cy, R2 * 0.58, va), [x2, y2] = PT(cx, cy, R2 * 1, va);
+  glow(c, "rgba(".concat(acc, ",1)"), 16);
+  c.beginPath();
+  c.moveTo(x1, y1);
+  c.lineTo(x2, y2);
+  c.lineWidth = Math.max(2.5, R2 * 0.022);
+  c.lineCap = "round";
+  c.strokeStyle = "#fff";
+  c.stroke();
+  noGlow(c);
+}
+function drawLuks(c, w, h, D) {
+  c.fillStyle = "#030409";
+  c.fillRect(0, 0, w, h);
+  const amb = c.createRadialGradient(w / 2, h * 1.15, 0, w / 2, h * 1.15, w * 0.62);
+  amb.addColorStop(0, "rgba(124,92,255,.30)");
+  amb.addColorStop(0.55, "rgba(60,110,255,.10)");
+  amb.addColorStop(1, "rgba(0,0,0,0)");
+  c.fillStyle = amb;
+  c.fillRect(0, 0, w, h);
+  const F2 = (wt, px) => "".concat(wt, " ").concat(px, "px Jost, ").concat(css("--f-ui")), wide = w / h > 1.35;
+  const ICE = "125,211,252";
+  if (wide) {
+    const R2 = Math.min(h * 0.43, w * 0.2), y = h * 0.53, xl = w * 0.205, xr = w * 0.795;
+    luxGauge(c, xl, y, R2, D.spd, 240, 20, 10, { acc: ICE, numEvery: 2 });
+    txt(c, n0(D.spd), xl, y - R2 * 0.02, F2(300, R2 * 0.4), "#fff");
+    spaced(c, "KM/SA", xl, y + R2 * 0.27, F2(400, R2 * 0.075), "rgba(200,210,235,.6)", 2);
+    luxGauge(c, xr, y, R2, D.rpm / 1e3, D.maxR / 1e3, 1, 0.25, { acc: "167,139,250", red: D.red / 1e3, nf: (v) => String(v) });
+    txt(c, fmt(D.rpm / 1e3, 1), xr, y - R2 * 0.04, F2(300, R2 * 0.3), "#fff");
+    spaced(c, "x1000 D/DK", xr, y + R2 * 0.22, F2(400, R2 * 0.07), "rgba(200,210,235,.6)", 1.5);
+    txt(c, "Su " + n0(D.cool) + "°", xr, y + R2 * 0.78, F2(400, R2 * 0.09), D.cool >= 105 ? "#ff7088" : "rgba(220,228,245,.85)");
+    txt(c, "Yakıt " + n0(D.fuel) + "%", xl, y + R2 * 0.78, F2(400, R2 * 0.09), D.fuel != null && D.fuel < 12 ? "#f3b33d" : "rgba(220,228,245,.85)");
+    const cx = w / 2, cw = w * 0.2;
+    txt(c, clock(D), cx, h * 0.16, F2(300, h * 0.075), "rgba(240,244,255,.95)");
+    if (D.amb != null) txt(c, n0(D.amb) + " °C", cx, h * 0.245, F2(400, h * 0.04), "rgba(180,192,220,.7)");
+    const rows = D.slots.map((s) => [s.lbl, s.v, s.u]);
+    rows.forEach((r, i) => {
+      const yy = h * 0.37 + i * h * 0.12;
+      spaced(c, r[0], cx - cw / 2, yy, F2(400, h * 0.032), "rgba(160,175,210,.75)", 1.5, "left");
+      txt(c, r[1], cx + cw / 2 - h * 0.075, yy, F2(400, h * 0.06), "#fff", "right");
+      txt(c, r[2], cx + cw / 2, yy + 1, F2(400, h * 0.03), "rgba(160,175,210,.8)", "right");
+      c.fillStyle = "rgba(255,255,255,.06)";
+      c.fillRect(cx - cw / 2, yy + h * 0.05, cw, 1);
+    });
+    warnBadge(c, cx - cw / 2 + 10, h * 0.9, D, "rgba(230,236,250,.9)", "Jost, sans-serif");
+  } else {
+    const R2 = Math.min(w * 0.38, h * 0.3), y = R2 * 1.14 + 10, cx = w / 2;
+    luxGauge(c, cx, y, R2, D.spd, 240, 20, 10, { acc: ICE, numEvery: 2 });
+    txt(c, n0(D.spd), cx, y - R2 * 0.05, F2(300, R2 * 0.42), "#fff");
+    spaced(c, "KM/SA", cx, y + R2 * 0.27, F2(400, R2 * 0.08), "rgba(200,210,235,.6)", 2);
+    const a0 = Math.PI * 0.75, a1 = Math.PI * 2.25;
+    arcS(c, cx, y, R2 * 1.12, a0, a1, 3, "rgba(255,255,255,.08)");
+    arcS(c, cx, y, R2 * 1.12, a0, angOf(a0, a1, D.rpm, D.maxR), 3, D.rpm >= D.red ? "#ff4d6d" : "rgba(167,139,250,.95)", "round");
+    luxInfoGrid(c, w, h, y + R2 * 1.25, D, F2);
+  }
+}
+function luxInfoGrid(c, w, h, top, D, F2) {
+  const items = [["DEVİR", fmt(D.rpm / 1e3, 1), "x1000"], ...D.slots.map((s) => [s.lbl, s.v, s.u]), ["SAAT", clock(D), ""]];
+  const cols = 3, gw = (w - 32) / cols, gh = Math.min(70, (h - top - 16) / 2);
+  items.forEach((it, i) => {
+    const x = 16 + i % cols * gw + gw / 2, y = top + Math.floor(i / cols) * gh + gh * 0.4;
+    spaced(c, it[0], x, y - gh * 0.24, F2(400, 10.5), "rgba(160,175,210,.75)", 1.2);
+    txt(c, it[1], x, y + gh * 0.12, F2(400, Math.min(26, gw * 0.24)), "#fff");
+    txt(c, it[2], x, y + gh * 0.42, F2(400, 10.5), "rgba(160,175,210,.7)");
+  });
+}
+function hexFrame(c, cx, cy, R2, col) {
+  c.beginPath();
+  for (let i = 0; i <= 6; i++) {
+    const [x, y] = PT(cx, cy, R2, Math.PI / 6 + i * Math.PI / 3);
+    i ? c.lineTo(x, y) : c.moveTo(x, y);
+  }
+  c.strokeStyle = col;
+  c.lineWidth = 1.2;
+  c.stroke();
+  for (let i = 0; i < 6; i++) {
+    const [x, y] = PT(cx, cy, R2, Math.PI / 6 + i * Math.PI / 3);
+    c.fillStyle = "#ff6a1a";
+    c.fillRect(x - 1.5, y - 1.5, 3, 3);
+  }
+}
+function segGauge(c, cx, cy, R2, a0, a1, val, max, o) {
+  const N = o.n || 46, gap = 0.012, span = (a1 - a0) / N, lit = clamp(val / max, 0, 1) * N;
+  for (let i = 0; i < N; i++) {
+    const s = a0 + i * span + gap, e = a0 + (i + 1) * span - gap, red = o.red != null && (i + 0.5) / N * max >= o.red;
+    let col = "#23272e";
+    if (i < Math.floor(lit) || i < lit && lit - i > 0.5) col = red ? "#ff2d2d" : o.col || "#ff6a1a";
+    else if (red) col = "rgba(255,45,45,.22)";
+    arcS(c, cx, cy, R2, s, e, R2 * 0.12, col);
+  }
+}
+function drawSport(c, w, h, D) {
+  var _a, _b;
+  const bg = c.createLinearGradient(0, 0, w, h);
+  bg.addColorStop(0, "#0b0c0e");
+  bg.addColorStop(0.5, "#14161a");
+  bg.addColorStop(1, "#0a0b0d");
+  c.fillStyle = bg;
+  c.fillRect(0, 0, w, h);
+  c.strokeStyle = "rgba(255,255,255,.025)";
+  c.lineWidth = 1;
+  for (let x = -h; x < w; x += 14) {
+    c.beginPath();
+    c.moveTo(x, h);
+    c.lineTo(x + h, 0);
+    c.stroke();
+  }
+  const F2 = (wt, px) => "".concat(wt, " ").concat(px, "px Saira, ").concat(css("--f-num")), wide = w / h > 1.35;
+  const mode = D.rpm > 4e3 || ((_a = D.thr) != null ? _a : 0) > 70 ? ["SPORT", "#ff6a1a"] : ((_b = D.load) != null ? _b : 50) < 32 && D.rpm < 2500 ? ["ECO", "#3ccf8e"] : ["COMFORT", "#9fb3c8"];
+  const skewTxt = (s, x, y, px, col) => {
+    c.save();
+    c.translate(x, y);
+    c.transform(1, 0, -0.18, 1, 0, 0);
+    txt(c, s, 0, 0, F2(700, px), col);
+    c.restore();
+  };
+  if (wide) {
+    const R2 = Math.min(h * 0.36, w * 0.16), y = h * 0.5, xl = w * 0.19, xr = w * 0.81;
+    hexFrame(c, xl, y, R2 * 1.12, "#3a3f47");
+    hexFrame(c, xr, y, R2 * 1.12, "#3a3f47");
+    segGauge(c, xl, y, R2 * 0.9, Math.PI * 0.7, Math.PI * 1.95, D.spd, 240, { col: "#e9eef5", n: 40 });
+    nums(c, xl, y, R2 * 0.6, Math.PI * 0.7, Math.PI * 1.95, 240, 40, F2(500, R2 * 0.11), "#8b95a3");
+    segGauge(c, xr, y, R2 * 0.9, Math.PI * 1.05, Math.PI * 2.3, D.rpm, D.maxR, { red: D.red, n: 40 });
+    nums(c, xr, y, R2 * 0.6, Math.PI * 1.05, Math.PI * 2.3, D.maxR, 1e3, F2(500, R2 * 0.11), "#8b95a3", { f: (v) => String(v / 1e3), red: D.red, redCol: "#ff4d4d" });
+    txt(c, n1(D.l100), xl + R2 * 0.12, y + R2 * 0.12, F2(600, R2 * 0.2), "#fff");
+    txt(c, "L/100", xl + R2 * 0.12, y + R2 * 0.33, F2(500, R2 * 0.08), "#8b95a3");
+    txt(c, fmt(D.rpm / 1e3, 1), xr - R2 * 0.12, y + R2 * 0.12, F2(600, R2 * 0.2), D.rpm >= D.red ? "#ff4d4d" : "#fff");
+    txt(c, "x1000", xr - R2 * 0.12, y + R2 * 0.33, F2(500, R2 * 0.08), "#8b95a3");
+    const cx = w / 2;
+    skewTxt(n0(D.spd), cx, h * 0.45, h * 0.3, "#fff");
+    spaced(c, "KM/SA", cx, h * 0.64, F2(500, h * 0.035), "#8b95a3", 3);
+    c.save();
+    para(c, cx - 48, h * 0.14 - 11, 96, 22, 6);
+    c.fillStyle = mode[1];
+    c.globalAlpha = 0.16;
+    c.fill();
+    c.globalAlpha = 1;
+    c.strokeStyle = mode[1];
+    c.lineWidth = 1.2;
+    c.stroke();
+    c.restore();
+    spaced(c, mode[0], cx + 3, h * 0.14, F2(700, 12), mode[1], 2);
+    const bw = w * 0.17, by = h * 0.8;
+    sportBar(c, cx - bw - 10, by, bw, "SU", D.cool, 50, 130, n0(D.cool) + "°", D.cool >= 105, F2);
+    sportBar(c, cx + 10, by, bw, "YAKIT", D.fuel, 0, 100, n0(D.fuel) + "%", D.fuel != null && D.fuel < 12, F2);
+    txt(c, clock(D), cx, h * 0.92, F2(500, 13), "#8b95a3");
+    if (D.turbo) txt(c, "TURBO " + fmt(D.boost, 2) + " bar", cx, h * 0.72, F2(500, 13), "#ff6a1a");
+    warnBadge(c, w * 0.04, h * 0.1, D, "#cfd6df", "Saira, sans-serif");
+  } else {
+    const R2 = Math.min(w * 0.36, h * 0.26), cx = w / 2, y = R2 * 1.15 + 12;
+    hexFrame(c, cx, y, R2 * 1.12, "#3a3f47");
+    segGauge(c, cx, y, R2 * 0.92, Math.PI * 0.75, Math.PI * 2.25, D.rpm, D.maxR, { red: D.red, n: 44 });
+    nums(c, cx, y, R2 * 0.66, Math.PI * 0.75, Math.PI * 2.25, D.maxR, 1e3, F2(500, R2 * 0.11), "#8b95a3", { f: (v) => String(v / 1e3), red: D.red, redCol: "#ff4d4d" });
+    skewTxt(n0(D.spd), cx, y - R2 * 0.02, R2 * 0.48, "#fff");
+    spaced(c, "KM/SA", cx, y + R2 * 0.3, F2(500, 11), "#8b95a3", 3);
+    spaced(c, mode[0], cx, y + R2 * 0.52, F2(700, 12), mode[1], 2);
+    const bw = (w - 52) / 2, by = y + R2 * 1.3;
+    sportBar(c, 16, by, bw, "SU", D.cool, 50, 130, n0(D.cool) + "°", D.cool >= 105, F2);
+    sportBar(c, 36 + bw, by, bw, "YAKIT", D.fuel, 0, 100, n0(D.fuel) + "%", D.fuel != null && D.fuel < 12, F2);
+    txt(c, "Anlık " + n1(D.l100) + " · Ort " + n1(D.avg) + " L/100", cx, by + 52, F2(500, 14), "#cfd6df");
+    if (D.turbo) txt(c, "Turbo " + fmt(D.boost, 2) + " bar", cx, by + 76, F2(500, 13), "#ff6a1a");
+  }
+}
+function sportBar(c, x, y, w, lbl, v, lo, hi, vt, bad, F2) {
+  spaced(c, lbl, x, y - 10, F2(600, 10.5), "#8b95a3", 2, "left");
+  txt(c, vt, x + w + 6, y - 10, F2(600, 13), bad ? "#ff4d4d" : "#e9eef5", "right");
+  const N = 16, sw = (w - (N - 1) * 3) / N, lit = v == null ? 0 : clamp((v - lo) / (hi - lo), 0, 1) * N;
+  for (let i = 0; i < N; i++) {
+    para(c, x + i * (sw + 3), y, sw, 9, 3);
+    c.fillStyle = i < lit ? bad ? "#ff2d2d" : "#ff6a1a" : "#23272e";
+    c.fill();
+  }
+}
+function ringDial(c, cx, cy, R2, val, max, major, minor, o) {
+  const a0 = Math.PI * 0.72, a1 = Math.PI * 2.28, va = angOf(a0, a1, val, max);
+  const band = c.createRadialGradient(cx, cy, R2 * 0.7, cx, cy, R2);
+  band.addColorStop(0, "#1b1d21");
+  band.addColorStop(0.8, "#2a2d33");
+  band.addColorStop(1, "#141518");
+  c.fillStyle = band;
+  c.beginPath();
+  c.arc(cx, cy, R2, 0, TAU);
+  c.arc(cx, cy, R2 * 0.76, 0, TAU, true);
+  c.fill("evenodd");
+  const inner = c.createRadialGradient(cx, cy - R2 * 0.2, 0, cx, cy, R2 * 0.76);
+  inner.addColorStop(0, "#15171b");
+  inner.addColorStop(1, "#08090a");
+  c.fillStyle = inner;
+  c.beginPath();
+  c.arc(cx, cy, R2 * 0.76, 0, TAU);
+  c.fill();
+  arcS(c, cx, cy, R2 * 0.76, 0, TAU, 1, "rgba(255,255,255,.12)");
+  arcS(c, cx, cy, R2, 0, TAU, 1, "rgba(255,255,255,.06)");
+  if (o.red != null) arcS(c, cx, cy, R2 * 0.79, angOf(a0, a1, o.red, max), a1, R2 * 0.03, "rgba(255,31,31,.75)");
+  ticks(c, cx, cy, R2 * 0.96, a0, a1, max, minor, major, { lj: R2 * 0.14, ln: R2 * 0.06, wj: 2.2, wn: 1, cj: "rgba(255,255,255,.92)", cn: "rgba(255,255,255,.4)", red: o.red, redCol: "#ff3030" });
+  nums(c, cx, cy, R2 * 0.62, a0, a1, max, major * (o.numEvery || 1), "300 ".concat(R2 * 0.12, 'px "Exo 2", ').concat(css("--f-ui")), "rgba(255,255,255,.88)", { f: o.nf, red: o.red, redCol: "#ff5050" });
+  const [tx, ty] = PT(cx, cy, R2 * 0.97, va), [b1x, b1y] = PT(cx, cy, R2 * 0.035, va + Math.PI / 2), [b2x, b2y] = PT(cx, cy, R2 * 0.035, va - Math.PI / 2), [kx, ky] = PT(cx, cy, R2 * 0.14, va + Math.PI);
+  glow(c, "rgba(255,40,40,.9)", 12);
+  c.beginPath();
+  c.moveTo(tx, ty);
+  c.lineTo(b1x, b1y);
+  c.lineTo(kx, ky);
+  c.lineTo(b2x, b2y);
+  c.closePath();
+  c.fillStyle = "#ff1f1f";
+  c.fill();
+  noGlow(c);
+  c.fillStyle = "#0e0f11";
+  c.beginPath();
+  c.arc(cx, cy, R2 * 0.07, 0, TAU);
+  c.fill();
+  arcS(c, cx, cy, R2 * 0.07, 0, TAU, 1.5, "#3a3d43");
+}
+function drawMatris(c, w, h, D) {
+  const bg = c.createRadialGradient(w / 2, h * 0.45, 0, w / 2, h * 0.5, w * 0.7);
+  bg.addColorStop(0, "#1a1c20");
+  bg.addColorStop(1, "#08090a");
+  c.fillStyle = bg;
+  c.fillRect(0, 0, w, h);
+  const F2 = (wt, px) => "".concat(wt, " ").concat(px, 'px "Exo 2", ').concat(css("--f-ui")), wide = w / h > 1.35;
+  if (wide) {
+    const R2 = Math.min(h * 0.41, w * 0.18), y = h * 0.52, xl = w * 0.2, xr = w * 0.8;
+    ringDial(c, xl, y, R2, D.rpm / 1e3, D.maxR / 1e3, 1, 0.5, { red: D.red / 1e3, nf: (v) => String(v) });
+    txt(c, "x1000/dk", xl, y + R2 * 0.3, F2(400, R2 * 0.075), "rgba(255,255,255,.5)");
+    txt(c, n0(D.cool) + " °C", xl, y + R2 * 0.47, F2(400, R2 * 0.09), D.cool >= 105 ? "#ff5050" : "rgba(255,255,255,.85)");
+    ringDial(c, xr, y, R2, D.spd, 260, 20, 10, { numEvery: 2 });
+    txt(c, n0(D.spd), xr, y + R2 * 0.36, F2(500, R2 * 0.17), "#fff");
+    txt(c, "km/sa", xr, y + R2 * 0.52, F2(400, R2 * 0.07), "rgba(255,255,255,.5)");
+    const px = w * 0.375, pw = w * 0.25, py = h * 0.16, ph = h * 0.7;
+    rr(c, px, py, pw, ph, 10);
+    c.fillStyle = "rgba(255,255,255,.03)";
+    c.fill();
+    c.strokeStyle = "rgba(255,255,255,.09)";
+    c.lineWidth = 1;
+    c.stroke();
+    spaced(c, "SÜRÜŞ BİLGİSAYARI", px + pw / 2, py + 18, F2(500, 10.5), "rgba(255,255,255,.55)", 1.5);
+    c.fillStyle = "rgba(255,31,31,.8)";
+    c.fillRect(px + pw / 2 - 14, py + 29, 28, 2);
+    txt(c, "Ø " + n1(D.avg), px + pw / 2 - 8, py + ph * 0.28, F2(300, ph * 0.13), "#fff");
+    txt(c, "L/100 km ortalama", px + pw / 2, py + ph * 0.39, F2(400, 11), "rgba(255,255,255,.5)");
+    const hist = (D.hist || []).slice(-60), gx = px + 14, gy = py + ph * 0.47, gw = pw - 28, gh = ph * 0.22;
+    c.strokeStyle = "rgba(255,255,255,.08)";
+    c.beginPath();
+    c.moveTo(gx, gy + gh);
+    c.lineTo(gx + gw, gy + gh);
+    c.stroke();
+    const bwid = gw / 60;
+    hist.forEach((v, i) => {
+      const hh = clamp((v || 0) / 20, 0, 1) * gh;
+      c.fillStyle = v > 12 ? "rgba(255,60,60,.85)" : "rgba(255,255,255,.55)";
+      c.fillRect(gx + (60 - hist.length + i) * bwid, gy + gh - hh, Math.max(1, bwid - 1), hh);
+    });
+    txt(c, "Anlık " + n1(D.l100), gx, gy - 8, F2(400, 11), "rgba(255,255,255,.7)", "left");
+    const r2 = py + ph * 0.8;
+    txt(c, n1(D.km) + " km", px + pw * 0.25, r2, F2(400, 15), "#fff");
+    txt(c, "yolculuk", px + pw * 0.25, r2 + 15, F2(400, 10), "rgba(255,255,255,.5)");
+    txt(c, n0(D.fuel) + " %", px + pw * 0.75, r2, F2(400, 15), D.fuel != null && D.fuel < 12 ? "#f3b33d" : "#fff");
+    txt(c, "yakıt", px + pw * 0.75, r2 + 15, F2(400, 10), "rgba(255,255,255,.5)");
+    txt(c, clock(D), w / 2, h * 0.08, F2(400, 14), "rgba(255,255,255,.75)");
+    warnBadge(c, w * 0.04, h * 0.08, D, "rgba(255,255,255,.85)", '"Exo 2", sans-serif');
+  } else {
+    const R2 = Math.min(w * 0.4, h * 0.28), cx = w / 2, y = R2 * 1.1 + 10;
+    ringDial(c, cx, y, R2, D.spd, 260, 20, 10, { numEvery: 2 });
+    txt(c, n0(D.spd), cx, y + R2 * 0.36, F2(500, R2 * 0.18), "#fff");
+    const a0 = Math.PI * 0.72, a1 = Math.PI * 2.28;
+    arcS(c, cx, y, R2 * 1.08, a0, a1, 3, "rgba(255,255,255,.08)");
+    arcS(c, cx, y, R2 * 1.08, a0, angOf(a0, a1, D.rpm, D.maxR), 3, D.rpm >= D.red ? "#ff3030" : "rgba(255,255,255,.75)");
+    const top = y + R2 * 1.22, items = [["Devir", fmt(D.rpm / 1e3, 1) + " x1000"], ...D.slots.map((s) => [s.name, s.v + " " + s.u]), ["Saat", clock(D)]];
+    items.forEach((it, i) => {
+      const yy = top + i * 26;
+      txt(c, it[0], 20, yy, F2(400, 13), "rgba(255,255,255,.55)", "left");
+      txt(c, it[1], w - 20, yy, F2(500, 15), "#fff", "right");
+      c.fillStyle = "rgba(255,255,255,.06)";
+      c.fillRect(20, yy + 12, w - 40, 1);
+    });
+  }
+}
+const CU = ["#8a4f2c", "#c9875a", "#f0b88a"];
+function blade(c, cx, cy, R2, s, val, max, red, th) {
+  const N = 46, a0 = -Math.PI / 2 - s, a1 = -Math.PI / 2 + s, span = (a1 - a0) / N, lit = clamp(val / max, 0, 1) * N;
+  for (let i = 0; i < N; i++) {
+    const aa = a0 + i * span, ab = aa + span * 0.72, sk = span * 0.35, isRed = (i + 0.5) / N * max >= red;
+    const [x1, y1] = PT(cx, cy, R2, aa + sk), [x2, y2] = PT(cx, cy, R2, ab + sk), [x3, y3] = PT(cx, cy, R2 - th, ab), [x4, y4] = PT(cx, cy, R2 - th, aa);
+    c.beginPath();
+    c.moveTo(x1, y1);
+    c.lineTo(x2, y2);
+    c.lineTo(x3, y3);
+    c.lineTo(x4, y4);
+    c.closePath();
+    if (i < lit) {
+      const k = i / N;
+      c.fillStyle = isRed ? "#ff3b30" : k < 0.5 ? CU[1] : CU[2];
+    } else c.fillStyle = isRed ? "rgba(255,59,48,.18)" : "#1d1714";
+    c.fill();
+  }
+  return [a0, a1];
+}
+function cuTile(c, x, y, w, h, lbl, val, unit, frac, bad, F2) {
+  c.beginPath();
+  c.moveTo(x + 10, y);
+  c.lineTo(x + w, y);
+  c.lineTo(x + w, y + h - 10);
+  c.lineTo(x + w - 10, y + h);
+  c.lineTo(x, y + h);
+  c.lineTo(x, y + 10);
+  c.closePath();
+  c.fillStyle = "rgba(201,135,90,.05)";
+  c.fill();
+  c.strokeStyle = "rgba(201,135,90,.35)";
+  c.lineWidth = 1;
+  c.stroke();
+  c.beginPath();
+  c.moveTo(x, y + 10);
+  c.lineTo(x + 10, y);
+  c.lineTo(x, y);
+  c.closePath();
+  c.fillStyle = CU[1];
+  c.fill();
+  spaced(c, lbl, x + 14, y + 15, F2(600, 11), CU[2], 2, "left");
+  txt(c, val, x + 14, y + h * 0.6, F2(700, Math.min(30, h * 0.36)), bad ? "#ff6a5a" : "#fff", "left");
+  c.font = F2(700, Math.min(30, h * 0.36));
+  const vw = c.measureText(val).width;
+  txt(c, unit, x + 18 + vw, y + h * 0.62, F2(500, 12), "rgba(240,184,138,.75)", "left");
+  if (frac != null) {
+    const bw = w - 28;
+    c.fillStyle = "#1d1714";
+    c.fillRect(x + 14, y + h - 12, bw, 3);
+    c.fillStyle = bad ? "#ff3b30" : CU[1];
+    c.fillRect(x + 14, y + h - 12, bw * clamp(frac, 0, 1), 3);
+  }
+}
+function drawBakir(c, w, h, D) {
+  c.fillStyle = "#050505";
+  c.fillRect(0, 0, w, h);
+  const gl = c.createRadialGradient(w / 2, -h * 0.2, 0, w / 2, -h * 0.2, w * 0.6);
+  gl.addColorStop(0, "rgba(201,135,90,.20)");
+  gl.addColorStop(1, "rgba(0,0,0,0)");
+  c.fillStyle = gl;
+  c.fillRect(0, 0, w, h);
+  c.strokeStyle = "rgba(201,135,90,.05)";
+  c.lineWidth = 1;
+  const tz = 28;
+  for (let yy = h * 0.72; yy < h + tz; yy += tz) for (let xx = 0; xx < w + tz; xx += tz) {
+    c.beginPath();
+    c.moveTo(xx, yy);
+    c.lineTo(xx + tz / 2, yy - tz * 0.86);
+    c.lineTo(xx + tz, yy);
+    c.stroke();
+  }
+  const F2 = (wt, px) => "".concat(wt, " ").concat(px, "px Rajdhani, ").concat(css("--f-num")), wide = w / h > 1.35;
+  if (wide) {
+    const R2 = w * 1.6, cy = h * 0.12 + R2, s = Math.asin(Math.min(0.99, w * 0.36 / R2));
+    const [a0, a1] = blade(c, w / 2, cy, R2, s, D.rpm, D.maxR, D.red, h * 0.075);
+    for (let v = 0; v <= D.maxR; v += 1e3) {
+      const [x, y] = PT(w / 2, cy, R2 - h * 0.12, angOf(a0, a1, v, D.maxR));
+      txt(c, String(v / 1e3), x, y, F2(600, 13), v >= D.red ? "#ff6a5a" : "rgba(240,184,138,.8)");
+    }
+    txt(c, n0(D.spd), w / 2, h * 0.56, F2(700, h * 0.36), "#fff");
+    spaced(c, "KM/SA", w / 2, h * 0.76, F2(600, 13), CU[2], 4);
+    c.strokeStyle = CU[1];
+    c.lineWidth = 1.5;
+    c.beginPath();
+    c.moveTo(w / 2 - 70, h * 0.82);
+    c.lineTo(w / 2 + 70, h * 0.82);
+    c.stroke();
+    c.beginPath();
+    c.moveTo(w / 2 - 6, h * 0.82);
+    c.lineTo(w / 2, h * 0.82 + 7);
+    c.lineTo(w / 2 + 6, h * 0.82);
+    c.closePath();
+    c.fillStyle = CU[1];
+    c.fill();
+    txt(c, clock(D) + (D.amb != null ? "   " + n0(D.amb) + " °C" : ""), w / 2, h * 0.9, F2(600, 14), "rgba(240,184,138,.8)");
+    const tw = w * 0.21, th = h * 0.22, xL = w * 0.035, xR = w - xL - tw, ty = h * 0.4;
+    D.slots.forEach((sl, i) => cuTile(c, i < 2 ? xL : xR, ty + i % 2 * (th + 12), tw, th, sl.lbl, sl.v, sl.u, sl.f, sl.bad, F2));
+    warnBadge(c, w * 0.04, h * 0.1, D, CU[2], "Rajdhani, sans-serif");
+  } else {
+    const R2 = w * 1.25, cy = h * 0.06 + 34 + R2, s = Math.asin(Math.min(0.99, w * 0.44 / R2));
+    blade(c, w / 2, cy, R2, s, D.rpm, D.maxR, D.red, 26);
+    txt(c, fmt(D.rpm / 1e3, 1) + " x1000", w / 2, h * 0.06 + 70, F2(600, 14), "rgba(240,184,138,.85)");
+    txt(c, n0(D.spd), w / 2, h * 0.32, F2(700, Math.min(w * 0.42, h * 0.2)), "#fff");
+    spaced(c, "KM/SA", w / 2, h * 0.44, F2(600, 13), CU[2], 4);
+    const tw = (w - 44) / 2, th = 78, y0 = h * 0.5;
+    D.slots.forEach((sl, i) => cuTile(c, i % 2 ? 28 + tw : 16, y0 + Math.floor(i / 2) * (th + 12), tw, th, sl.lbl, sl.v, sl.u, sl.f, sl.bad, F2));
+  }
+}
+function drawGece(c, w, h, D) {
+  c.fillStyle = "#000";
+  c.fillRect(0, 0, w, h);
+  const red = "rgba(255,72,50,", F2 = (wt, px) => "".concat(wt, " ").concat(px, 'px "Barlow Condensed", ').concat(css("--f-num")), wide = w / h > 1.35;
+  const sy = wide ? h * 0.48 : h * 0.3, sz = wide ? h * 0.48 : Math.min(w * 0.5, h * 0.24);
+  txt(c, n0(D.spd), w / 2, sy, F2(600, sz), red + ".9)");
+  spaced(c, "KM/SA", w / 2, sy + sz * 0.5, F2(500, 13), red + ".5)", 4);
+  const bw = Math.min(w * 0.6, 520), bx = (w - bw) / 2, by = sy + sz * 0.68;
+  c.fillStyle = red + ".12)";
+  c.fillRect(bx, by, bw, 4);
+  c.fillStyle = D.rpm >= D.red ? red + "1)" : red + ".6)";
+  c.fillRect(bx, by, bw * clamp(D.rpm / D.maxR, 0, 1), 4);
+  const items = D.slots.map((s) => [s.lbl, s.v + (s.u.length <= 2 ? s.u : "")]);
+  items.forEach((it, i) => {
+    const x = bx + bw / (items.length - 1) * i, y = by + 40;
+    txt(c, it[1], x, y, F2(500, 22), red + ".75)");
+    spaced(c, it[0], x, y + 20, F2(500, 10.5), red + ".4)", 2);
+  });
+  if (D.crit) warnBadge(c, w * 0.04, h * 0.1, D, red + ".8)", "Barlow Condensed, sans-serif");
+}
+function bezel(c, cx, cy, R2) {
+  const g = c.createLinearGradient(cx - R2, cy - R2, cx + R2, cy + R2);
+  g.addColorStop(0, "#5b5f66");
+  g.addColorStop(0.35, "#1c1e22");
+  g.addColorStop(0.65, "#2f3237");
+  g.addColorStop(1, "#0c0d0f");
+  c.fillStyle = g;
+  c.beginPath();
+  c.arc(cx, cy, R2 * 1.06, 0, TAU);
+  c.fill();
+  c.fillStyle = "#060607";
+  c.beginPath();
+  c.arc(cx, cy, R2, 0, TAU);
+  c.fill();
+}
+function needle(c, cx, cy, r0, r1, a, col, wd, glowCol) {
+  const [x1, y1] = PT(cx, cy, -r0, a), [x2, y2] = PT(cx, cy, r1, a);
+  if (glowCol) glow(c, glowCol, 10);
+  c.beginPath();
+  c.moveTo(x1, y1);
+  c.lineTo(x2, y2);
+  c.lineWidth = wd;
+  c.lineCap = "round";
+  c.strokeStyle = col;
+  c.stroke();
+  noGlow(c);
+}
+function drawPist(c, w, h, D) {
+  c.fillStyle = "#0a0a0b";
+  c.fillRect(0, 0, w, h);
+  const vg = c.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w * 0.6);
+  vg.addColorStop(0, "rgba(255,255,255,.05)");
+  vg.addColorStop(1, "rgba(0,0,0,0)");
+  c.fillStyle = vg;
+  c.fillRect(0, 0, w, h);
+  const F2 = (wt, px) => "".concat(wt, " ").concat(px, 'px "Chakra Petch", ').concat(css("--f-num")), wide = w / h > 1.35;
+  const tach = (cx, cy, R2) => {
+    bezel(c, cx, cy, R2);
+    const a0 = Math.PI * 0.68, a1 = Math.PI * 2.32, mx = D.maxR / 1e3, red = D.red / 1e3;
+    arcS(c, cx, cy, R2 * 0.9, angOf(a0, a1, red, mx), a1, R2 * 0.07, "#c8102e");
+    ticks(c, cx, cy, R2 * 0.94, a0, a1, mx, 0.25, 1, { lj: R2 * 0.12, ln: R2 * 0.05, wj: 3, wn: 1.5, cj: "#f4f4f4", cn: "rgba(255,255,255,.55)", red, redCol: "#ff3a4a" });
+    nums(c, cx, cy, R2 * 0.68, a0, a1, mx, 1, F2(700, R2 * 0.17), "#f4f4f4", { red, redCol: "#ff3a4a" });
+    txt(c, "1/min x1000", cx, cy - R2 * 0.36, F2(500, R2 * 0.06), "rgba(255,255,255,.45)");
+    txt(c, n0(D.spd), cx, cy + R2 * 0.42, F2(700, R2 * 0.22), "#fff");
+    txt(c, "km/sa", cx, cy + R2 * 0.58, F2(500, R2 * 0.065), "rgba(255,255,255,.5)");
+    const va = angOf(a0, a1, D.rpm / 1e3, mx);
+    needle(c, cx, cy, R2 * 0.12, R2 * 0.9, va, "#ff5a1f", Math.max(3, R2 * 0.035), "rgba(255,90,31,.8)");
+    c.fillStyle = "#111";
+    c.beginPath();
+    c.arc(cx, cy, R2 * 0.09, 0, TAU);
+    c.fill();
+    arcS(c, cx, cy, R2 * 0.09, 0, TAU, 2, "#444");
+  };
+  const small = (cx, cy, R2, kind) => {
+    bezel(c, cx, cy, R2);
+    if (kind === "spd") {
+      const a0 = Math.PI * 0.75, a1 = Math.PI * 2.25;
+      ticks(c, cx, cy, R2 * 0.93, a0, a1, 260, 10, 40, { lj: R2 * 0.12, ln: R2 * 0.05, wj: 2, wn: 1, cj: "#eee", cn: "rgba(255,255,255,.4)" });
+      nums(c, cx, cy, R2 * 0.66, a0, a1, 240, 40, F2(600, R2 * 0.14), "#e8e8e8");
+      needle(c, cx, cy, R2 * 0.1, R2 * 0.88, angOf(a0, a1, D.spd, 260), "#ff5a1f", 2.5, "rgba(255,90,31,.7)");
+      txt(c, "km/sa", cx, cy + R2 * 0.45, F2(500, R2 * 0.1), "rgba(255,255,255,.5)");
+    } else {
+      const t0 = Math.PI * 1.15, t1 = Math.PI * 1.85, f0 = Math.PI * 0.85, f1 = Math.PI * 0.15;
+      ticks(c, cx, cy, R2 * 0.92, t0, t1, 80, 10, 40, { lj: R2 * 0.12, ln: R2 * 0.06, wj: 2, wn: 1, cj: "#eee", cn: "rgba(255,255,255,.4)", red: 60, redCol: "#ff3a4a" });
+      ticks(c, cx, cy, R2 * 0.92, f0, f1, 100, 12.5, 50, { lj: R2 * 0.12, ln: R2 * 0.06, wj: 2, wn: 1, cj: "#eee", cn: "rgba(255,255,255,.4)" });
+      txt(c, "50", ...PT(cx, cy, R2 * 0.66, t0), F2(600, R2 * 0.11), "#ddd");
+      txt(c, "130", ...PT(cx, cy, R2 * 0.66, t1), F2(600, R2 * 0.11), "#ff6070");
+      txt(c, "0", ...PT(cx, cy, R2 * 0.66, f0), F2(600, R2 * 0.11), "#ff6070");
+      txt(c, "1/1", ...PT(cx, cy, R2 * 0.66, f1), F2(600, R2 * 0.11), "#ddd");
+      txt(c, "°C", cx, cy - R2 * 0.32, F2(600, R2 * 0.11), "rgba(255,255,255,.6)");
+      txt(c, "YAKIT", cx, cy + R2 * 0.32, F2(600, R2 * 0.09), "rgba(255,255,255,.6)");
+      if (D.cool != null) needle(c, cx, cy, 0, R2 * 0.86, angOf(t0, t1, D.cool - 50, 80), "#ff5a1f", 2.5);
+      if (D.fuel != null) needle(c, cx, cy, 0, R2 * 0.86, angOf(f0, f1, D.fuel, 100), "#ff5a1f", 2.5);
+      c.fillStyle = "#222";
+      c.beginPath();
+      c.arc(cx, cy, R2 * 0.08, 0, TAU);
+      c.fill();
+    }
+  };
+  if (wide) {
+    const R2 = Math.min(h * 0.45, w * 0.22);
+    small(w * 0.155, h * 0.56, R2 * 0.56, "spd");
+    small(w * 0.845, h * 0.56, R2 * 0.56, "cf");
+    tach(w / 2, h * 0.52, R2);
+    txt(c, clock(D), w * 0.155, h * 0.12, F2(600, 15), "rgba(255,255,255,.7)");
+    txt(c, n1(D.l100) + " L/100", w * 0.845, h * 0.12, F2(600, 15), "rgba(255,255,255,.7)");
+    warnBadge(c, w * 0.04, h * 0.92, D, "#ddd", '"Chakra Petch", sans-serif');
+  } else {
+    const R2 = Math.min(w * 0.42, h * 0.27);
+    tach(w / 2, R2 * 1.12 + 8, R2);
+    const r2 = (w - 60) / 4.4, y2 = R2 * 2.3 + r2 + 18;
+    small(w * 0.27, y2, r2, "spd");
+    small(w * 0.73, y2, r2, "cf");
+  }
+}
+let retroOff = 0, retroT = 0;
+function drawRetro(c, w, h, D) {
+  const now2 = performance.now(), dt = retroT ? Math.min(0.1, (now2 - retroT) / 1e3) : 0;
+  retroT = now2;
+  retroOff = (retroOff + (D.spd || 0) * dt * 0.02) % 1;
+  const F2 = (wt, px) => "".concat(wt, " ").concat(px, "px Orbitron, ").concat(css("--f-num")), wide = w / h > 1.35, hz = h * (wide ? 0.6 : 0.5);
+  const sky = c.createLinearGradient(0, 0, 0, hz);
+  sky.addColorStop(0, "#07021a");
+  sky.addColorStop(1, "#2a0646");
+  c.fillStyle = sky;
+  c.fillRect(0, 0, w, hz);
+  c.fillStyle = "#06010f";
+  c.fillRect(0, hz, w, h - hz);
+  const sr = Math.min(w, h) * (wide ? 0.32 : 0.3), sx = w / 2, sy = hz;
+  const sg = c.createLinearGradient(0, sy - sr, 0, sy);
+  sg.addColorStop(0, "#ffd36e");
+  sg.addColorStop(0.5, "#ff6a8a");
+  sg.addColorStop(1, "#c2187a");
+  c.save();
+  c.beginPath();
+  c.arc(sx, sy, sr, Math.PI, TAU);
+  c.closePath();
+  c.clip();
+  c.fillStyle = sg;
+  c.fillRect(sx - sr, sy - sr, sr * 2, sr);
+  c.fillStyle = "#1a0436";
+  for (let i = 0; i < 7; i++) {
+    const yy = sy - sr * 0.45 + i * sr * 0.08, th = 1 + i * 1.3;
+    c.fillRect(sx - sr, yy, sr * 2, th);
+  }
+  c.restore();
+  c.strokeStyle = "rgba(255,46,180,.75)";
+  c.lineWidth = 1.2;
+  glow(c, "rgba(255,46,180,.9)", 6);
+  for (let i = -12; i <= 12; i++) {
+    c.beginPath();
+    c.moveTo(w / 2 + i * w * 0.02, hz);
+    c.lineTo(w / 2 + i * w * 0.16, h);
+    c.stroke();
+  }
+  for (let k = 0; k < 9; k++) {
+    const z = (k + retroOff) / 9, y = hz + (h - hz) * z * z;
+    c.globalAlpha = 0.25 + 0.75 * z;
+    c.beginPath();
+    c.moveTo(0, y);
+    c.lineTo(w, y);
+    c.stroke();
+  }
+  c.globalAlpha = 1;
+  noGlow(c);
+  const N = 28, bw = (wide ? w * 0.7 : w - 32) / N, bx = (w - bw * N) / 2, bh = h * (wide ? 0.11 : 0.06), by = h * 0.06, lit = clamp(D.rpm / D.maxR, 0, 1) * N;
+  for (let i = 0; i < N; i++) {
+    const k = i / N, hh = bh * (0.35 + 0.65 * k), on = i < lit, red = (i + 0.5) / N * D.maxR >= D.red;
+    c.fillStyle = on ? red ? "#ff2e55" : k < 0.55 ? "#2ef2ff" : "#ff2eb4" : "rgba(46,242,255,.10)";
+    if (on) glow(c, c.fillStyle, 8);
+    c.fillRect(bx + i * bw + 1, by + bh - hh, bw - 3, hh);
+    noGlow(c);
+  }
+  glow(c, "rgba(46,242,255,.95)", 22);
+  txt(c, n0(D.spd), w / 2, wide ? h * 0.42 : h * 0.3, F2(900, wide ? h * 0.3 : w * 0.3), "#e8feff");
+  noGlow(c);
+  spaced(c, "KM/SA", w / 2, wide ? h * 0.58 : h * 0.41, F2(500, 12), "#2ef2ff", 5);
+  const info = D.slots.map((s) => [s.lbl, s.v + (s.u.length <= 2 ? s.u : "")]);
+  info.forEach((it, i) => {
+    let x, y;
+    if (wide) {
+      x = i < 2 ? w * 0.1 : w * 0.9;
+      y = h * (0.36 + i % 2 * 0.17);
+    } else {
+      x = w * (0.18 + i * 0.213);
+      y = h * 0.85;
+    }
+    spaced(c, it[0], x, y - 12, F2(500, 10), "#ff2eb4", 2);
+    glow(c, "rgba(255,46,180,.8)", 8);
+    txt(c, it[1], x, y + 8, F2(700, wide ? 20 : 16), "#ffe3f6");
+    noGlow(c);
+  });
+  warnBadge(c, 16, h - 18, D, "#ffe3f6", "Orbitron, sans-serif");
+}
+function vintageDial(c, cx, cy, R2, val, max, major, minor, F2, o = {}) {
+  const ring = c.createLinearGradient(cx - R2, cy - R2, cx + R2, cy + R2);
+  ring.addColorStop(0, "#f5f5f5");
+  ring.addColorStop(0.3, "#8a8d92");
+  ring.addColorStop(0.55, "#e4e6ea");
+  ring.addColorStop(1, "#55585d");
+  c.fillStyle = ring;
+  c.beginPath();
+  c.arc(cx, cy, R2 * 1.08, 0, TAU);
+  c.fill();
+  const face = c.createRadialGradient(cx, cy - R2 * 0.3, R2 * 0.1, cx, cy, R2);
+  face.addColorStop(0, "#fbf6ea");
+  face.addColorStop(1, "#ddd0b5");
+  c.fillStyle = face;
+  c.beginPath();
+  c.arc(cx, cy, R2, 0, TAU);
+  c.fill();
+  const a0 = Math.PI * 0.75, a1 = Math.PI * 2.25;
+  if (o.red != null) arcS(c, cx, cy, R2 * 0.86, angOf(a0, a1, o.red, max), a1, R2 * 0.06, "#b3261e");
+  ticks(c, cx, cy, R2 * 0.93, a0, a1, max, minor, major, { lj: R2 * 0.13, ln: R2 * 0.06, wj: 2.5, wn: 1.2, cj: "#1a1a1a", cn: "#4a4640", red: o.red, redCol: "#b3261e" });
+  nums(c, cx, cy, R2 * 0.66, a0, a1, max, major * (o.numEvery || 1), F2(500, R2 * 0.15), "#1a1a1a", { f: o.nf, red: o.red, redCol: "#b3261e" });
+  if (o.label) txt(c, o.label, cx, cy - R2 * 0.32, F2(400, R2 * 0.08), "#4a4640");
+  if (o.sub) txt(c, o.sub, cx, cy + R2 * 0.42, F2(500, R2 * 0.13), "#1a1a1a");
+  const va = angOf(a0, a1, val, max), [tx, ty] = PT(cx, cy, R2 * 0.88, va), [bx, by] = PT(cx, cy, R2 * 0.18, va + Math.PI);
+  c.save();
+  c.shadowColor = "rgba(0,0,0,.35)";
+  c.shadowBlur = 4;
+  c.shadowOffsetY = 2;
+  c.beginPath();
+  c.moveTo(bx, by);
+  c.lineTo(tx, ty);
+  c.lineWidth = Math.max(2.5, R2 * 0.03);
+  c.lineCap = "round";
+  c.strokeStyle = "#ff5a14";
+  c.stroke();
+  c.restore();
+  const cap = c.createRadialGradient(cx - R2 * 0.02, cy - R2 * 0.02, 0, cx, cy, R2 * 0.08);
+  cap.addColorStop(0, "#f0f0f0");
+  cap.addColorStop(1, "#3a3a3a");
+  c.fillStyle = cap;
+  c.beginPath();
+  c.arc(cx, cy, R2 * 0.075, 0, TAU);
+  c.fill();
+  c.save();
+  c.beginPath();
+  c.arc(cx, cy, R2, 0, TAU);
+  c.clip();
+  const gl = c.createLinearGradient(cx - R2, cy - R2, cx, cy);
+  gl.addColorStop(0, "rgba(255,255,255,.35)");
+  gl.addColorStop(1, "rgba(255,255,255,0)");
+  c.fillStyle = gl;
+  c.beginPath();
+  c.ellipse(cx - R2 * 0.25, cy - R2 * 0.45, R2 * 0.85, R2 * 0.4, -0.5, 0, TAU);
+  c.fill();
+  c.restore();
+}
+function drawKlasik(c, w, h, D) {
+  var _a, _b, _c, _d;
+  const bg = c.createLinearGradient(0, 0, 0, h);
+  bg.addColorStop(0, "#241912");
+  bg.addColorStop(1, "#120c08");
+  c.fillStyle = bg;
+  c.fillRect(0, 0, w, h);
+  c.strokeStyle = "rgba(255,220,180,.035)";
+  c.lineWidth = 1;
+  for (let y = 4; y < h; y += 5) {
+    c.beginPath();
+    c.moveTo(0, y + Math.sin(y * 0.3) * 1.5);
+    c.lineTo(w, y);
+    c.stroke();
+  }
+  const F2 = (wt, px) => "".concat(wt, " ").concat(px, "px Oswald, ").concat(css("--f-num")), wide = w / h > 1.35;
+  if (wide) {
+    const R2 = Math.min(h * 0.4, w * 0.19), y = h * 0.52;
+    vintageDial(c, w * 0.24, y, R2, D.spd, 240, 20, 10, F2, { numEvery: 2, label: "km/sa", sub: n1(D.km) + " km" });
+    vintageDial(c, w * 0.76, y, R2, D.rpm / 1e3, D.maxR / 1e3, 1, 0.5, F2, { red: D.red / 1e3, nf: (v) => String(v), label: "x1000 d/dk", sub: clock(D) });
+    const r2 = R2 * 0.42;
+    vintageDial(c, w / 2, y - R2 * 0.5, r2, ((_a = D.cool) != null ? _a : 50) - 50, 80, 40, 10, F2, { nf: (v) => String(v + 50), label: "SU °C" });
+    vintageDial(c, w / 2, y + R2 * 0.5, r2, (_b = D.fuel) != null ? _b : 0, 100, 50, 12.5, F2, { nf: (v) => v === 0 ? "0" : v === 100 ? "1/1" : "½", label: "YAKIT" });
+    warnBadge(c, w * 0.04, h * 0.92, D, "#f0e2c8", "Oswald, sans-serif");
+  } else {
+    const R2 = Math.min(w * 0.36, h / 5.8);
+    vintageDial(c, w / 2, R2 * 1.14 + 8, R2, D.spd, 240, 20, 10, F2, { numEvery: 2, label: "km/sa", sub: n1(D.km) + " km" });
+    vintageDial(c, w / 2, R2 * 3.35 + 8, R2 * 0.9, D.rpm / 1e3, D.maxR / 1e3, 1, 0.5, F2, { red: D.red / 1e3, nf: (v) => String(v), label: "x1000 d/dk" });
+    const r2 = R2 * 0.5, yy = R2 * 5 + 12;
+    vintageDial(c, w * 0.3, yy, r2, ((_c = D.cool) != null ? _c : 50) - 50, 80, 40, 10, F2, { nf: (v) => String(v + 50), label: "SU" });
+    vintageDial(c, w * 0.7, yy, r2, (_d = D.fuel) != null ? _d : 0, 100, 50, 12.5, F2, { nf: (v) => v === 0 ? "0" : v === 100 ? "1/1" : "½", label: "YAKIT" });
+  }
+}
+function drawHud(c, w, h, D) {
+  c.fillStyle = "#000";
+  c.fillRect(0, 0, w, h);
+  if (SET.hudMirror) {
+    c.translate(w, 0);
+    c.scale(-1, 1);
+  }
+  const col = SET.hudColor || "#3dff8f", F2 = (wt, px) => "".concat(wt, " ").concat(px, 'px "Barlow Condensed", ').concat(css("--f-num")), wide = w / h > 1.35;
+  const sz = wide ? h * 0.55 : Math.min(w * 0.5, h * 0.3), sy = wide ? h * 0.42 : h * 0.3;
+  glow(c, col, 14);
+  txt(c, n0(D.spd), w / 2, sy, F2(700, sz), col);
+  noGlow(c);
+  spaced(c, "KM/SA", w / 2, sy + sz * 0.5, F2(600, 16), col, 5);
+  const bw = wide ? Math.min(w * 0.6, 560) : w * 0.86, bx = (w - bw) / 2, by = sy + sz * 0.66, N = 30, lit = clamp(D.rpm / D.maxR, 0, 1) * N;
+  for (let i = 0; i < N; i++) {
+    c.fillStyle = i < lit ? (i + 0.5) / N * D.maxR >= D.red ? "#ff3b3b" : col : "rgba(61,255,143,.12)";
+    c.fillRect(bx + i * (bw / N), by, bw / N - 3, 8);
+  }
+  const items = D.slots.map((s) => s.v + (s.u ? " " + s.u : ""));
+  items.forEach((s, i) => wide ? txt(c, s, bx + bw / (items.length - 1) * i, by + 36, F2(600, 22), col) : txt(c, s, w / 2, by + 36 + i * 30, F2(600, 22), col));
+  if (D.alerts) {
+    glow(c, "#ff3b3b", 10);
+    txt(c, "! " + D.alerts + " UYARI", w / 2, h * 0.08, F2(700, 20), D.crit ? "#ff3b3b" : "#ffc94a");
+    noGlow(c);
+  }
+}
+const ECO = { t: 0, eco: 0, cut: 0, last: 0, tip: "", tipAt: 0 };
+function ecoZone(D) {
+  var _a, _b;
+  if (((_a = D.thr) != null ? _a : 0) < 3 && D.spd > 15 && D.rpm > 1100) return "cut";
+  const L = (_b = D.load) != null ? _b : 0;
+  if (L < 55) return "eco";
+  return "power";
+}
+function ecoTip(D) {
+  var _a, _b;
+  const dz = effFuel() === "dizel", up = dz ? 2300 : 2900;
+  if (((_a = D.thr) != null ? _a : 0) > 75 && D.spd < 60) return "Daha yumuşak hızlanın";
+  if (D.rpm > up && ((_b = D.load) != null ? _b : 50) < 45 && D.spd > 25) return "Vites yükseltin";
+  if (ecoZone(D) === "cut") return "Motor freni: yakıt kesik";
+  if (D.spd < 2 && D.rpm > 400) return "Rölantide bekliyorsunuz";
+  if (D.spd > 115) return "Hız yükseldikçe tüketim hızla artar";
+  return "Akıcı sürüş, iyi gidiyorsunuz";
+}
+function drawVerim(c, w, h, D) {
+  const now2 = performance.now(), dt = ECO.last ? Math.min(0.2, (now2 - ECO.last) / 1e3) : 0;
+  ECO.last = now2;
+  if (D.rpm > 400) {
+    ECO.t += dt;
+    const z = ecoZone(D);
+    if (z !== "power") ECO.eco += dt;
+    if (z === "cut") ECO.cut += dt;
+  }
+  if (now2 - ECO.tipAt > 2500) {
+    ECO.tip = ecoTip(D);
+    ECO.tipAt = now2;
+  }
+  const score = ECO.t > 5 ? Math.round(ECO.eco / ECO.t * 100) : null;
+  c.fillStyle = "#06100c";
+  c.fillRect(0, 0, w, h);
+  const amb = c.createRadialGradient(w / 2, h, 0, w / 2, h, w * 0.6);
+  amb.addColorStop(0, "rgba(40,200,140,.16)");
+  amb.addColorStop(1, "rgba(0,0,0,0)");
+  c.fillStyle = amb;
+  c.fillRect(0, 0, w, h);
+  const F2 = (wt, px) => "".concat(wt, " ").concat(px, "px Jost, ").concat(css("--f-ui")), wide = w / h > 1.35;
+  const meter = (cx, cy, R2) => {
+    var _a;
+    const a0 = Math.PI, a1 = TAU, z = [[0, 0.18, "#3aa0ff", "KESİK"], [0.18, 0.62, "#2fd08a", "ECO"], [0.62, 1, "#f2a33a", "GÜÇ"]];
+    for (const [s, e, col2, lb] of z) {
+      arcS(c, cx, cy, R2, a0 + (a1 - a0) * s + 0.01, a0 + (a1 - a0) * e - 0.01, R2 * 0.12, col2 + "40");
+      const [lx, ly] = PT(cx, cy, R2 * 1.17, a0 + (a1 - a0) * (s + e) / 2);
+      txt(c, lb, lx, ly, F2(500, Math.max(10, R2 * 0.08)), col2);
+    }
+    const zn = ecoZone(D), pos = zn === "cut" ? 0.09 : 0.18 + clamp(((_a = D.load) != null ? _a : 0) / 100, 0, 1) * 0.82;
+    const col = zn === "cut" ? "#3aa0ff" : pos < 0.62 ? "#2fd08a" : "#f2a33a";
+    arcS(c, cx, cy, R2, zn === "cut" ? a0 : a0 + (a1 - a0) * 0.18, a0 + (a1 - a0) * pos, R2 * 0.12, col);
+    const [nx, ny] = PT(cx, cy, R2 * 1, a0 + (a1 - a0) * pos);
+    glow(c, col, 12);
+    c.fillStyle = "#fff";
+    c.beginPath();
+    c.arc(nx, ny, R2 * 0.07, 0, TAU);
+    c.fill();
+    noGlow(c);
+    txt(c, n0(D.spd), cx, cy - R2 * 0.28, F2(300, R2 * 0.55), "#fff");
+    txt(c, "km/sa", cx, cy - R2 * 0.02, F2(400, R2 * 0.09), "rgba(220,240,230,.6)");
+  };
+  const ring = (cx, cy, R2) => {
+    arcS(c, cx, cy, R2, 0, TAU, R2 * 0.14, "rgba(255,255,255,.07)");
+    if (score != null) arcS(c, cx, cy, R2, -Math.PI / 2, -Math.PI / 2 + TAU * score / 100, R2 * 0.14, score >= 70 ? "#2fd08a" : score >= 45 ? "#f2a33a" : "#ff5a5a", "round");
+    txt(c, score == null ? "--" : String(score), cx, cy - R2 * 0.05, F2(300, R2 * 0.55), "#fff");
+    txt(c, "verim puanı", cx, cy + R2 * 0.38, F2(400, Math.max(10, R2 * 0.13)), "rgba(220,240,230,.6)");
+  };
+  if (wide) {
+    meter(w * 0.42, h * 0.72, Math.min(h * 0.52, w * 0.25));
+    ring(w * 0.83, h * 0.42, Math.min(h * 0.22, w * 0.1));
+    txt(c, ECO.tip, w * 0.42, h * 0.88, F2(500, 17), "#d9f7ea");
+    const rows = [["Anlık", n1(D.l100) + " L/100"], ["Ortalama", n1(D.avg) + " L/100"], ["Yakıt kesik", ECO.t > 5 ? Math.round(ECO.cut / ECO.t * 100) + " %" : "--"]];
+    rows.forEach((r, i) => {
+      const yy = h * 0.74 + i * 22;
+      txt(c, r[0], w * 0.75, yy, F2(400, 13), "rgba(220,240,230,.6)", "left");
+      txt(c, r[1], w * 0.95, yy, F2(500, 15), "#fff", "right");
+    });
+    txt(c, clock(D), w * 0.06, h * 0.1, F2(400, 15), "rgba(220,240,230,.75)", "left");
+    warnBadge(c, w * 0.06, h * 0.2, D, "#d9f7ea", "Jost, sans-serif");
+  } else {
+    const R2 = Math.min(w * 0.4, h * 0.25);
+    meter(w / 2, R2 * 1.35 + 10, R2);
+    txt(c, ECO.tip, w / 2, R2 * 1.35 + 40, F2(500, 15), "#d9f7ea");
+    ring(w / 2, R2 * 2.35 + 30, R2 * 0.5);
+    txt(c, "Anlık " + n1(D.l100) + " · Ort " + n1(D.avg) + " L/100", w / 2, R2 * 3.05 + 40, F2(500, 14), "#fff");
+  }
+}
+let THEME = "luks";
+try {
+  THEME = localStorage.getItem("mgmk.theme") || "luks";
+} catch (e) {
+}
+if (!THEMES.some((t) => t.k === THEME)) THEME = "luks";
+let sweepAt = 0;
+const clCv = () => $("clusterCv");
+let clW = 0, clH = 0, lastClDraw = 0;
+function resizeCluster() {
+  const cv = clCv();
+  if (!cv) return;
+  const r = cv.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
+  if (!r.width) return;
+  clW = r.width;
+  clH = r.height;
+  cv.width = Math.round(r.width * dpr);
+  cv.height = Math.round(r.height * dpr);
+  cv.getContext("2d").setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener("resize", () => setTimeout(resizeCluster, 60));
+function clusterData() {
+  var _a, _b;
+  const dz = effFuel() === "dizel", maxR = dz ? 5e3 : 7e3, red = dz ? 4300 : 6e3;
+  let rpm = shownRpm, spd = shownSpd;
+  const st = performance.now() - sweepAt;
+  if (sweepAt && st < 1500) {
+    const k = st < 750 ? easeIO(st / 750) : 1 - easeIO((st - 750) / 750);
+    rpm = rpm + (maxR - rpm) * k;
+    spd = spd + (240 - spd) * k;
+  }
+  const fs = [...F.values()], alerts = fs.filter((f) => f.sev !== "info").length;
+  return {
+    spd,
+    rpm,
+    maxR,
+    red,
+    cool: V("cool"),
+    fuel: V("fuel"),
+    batt: (_a = V("batt")) != null ? _a : V("ecuV"),
+    l100: ((_b = V("speed")) != null ? _b : 0) > 3 ? V("l100") : null,
+    avg: S.trip.km > 0.3 && S.trip.L > 0 ? S.trip.L / S.trip.km * 100 : null,
+    km: S.trip.km,
+    boost: V("boost"),
+    turbo: !!SET.turbo && V("boost") != null,
+    amb: V("amb"),
+    load: V("load"),
+    thr: V("thr"),
+    hist: S.hist.l100,
+    alerts,
+    crit: fs.some((f) => f.sev === "crit")
+  };
+}
+function clusterData2() {
+  var _a;
+  const D = clusterData();
+  D.slots = slotData(D);
+  D.over = SET.limit > 0 && ((_a = V("speed")) != null ? _a : 0) > SET.limit + 1;
+  return D;
+}
+function drawCluster(ts) {
+  const t = THEMES.find((x) => x.k === THEME);
+  if (!t || !t.draw || !clW) return;
+  if (ts - lastClDraw < 30) return;
+  lastClDraw = ts;
+  const c = clCv().getContext("2d");
+  const D = clusterData2();
+  c.save();
+  t.draw(c, clW, clH, D);
+  c.restore();
+  if (D.over) {
+    const a = 0.45 + 0.35 * Math.sin(ts / 160);
+    c.save();
+    c.strokeStyle = "rgba(255,50,50,".concat(a, ")");
+    c.lineWidth = 8;
+    c.strokeRect(4, 4, clW - 8, clH - 8);
+    const bw = 170, bx = clW / 2 - bw / 2;
+    c.fillStyle = "rgba(200,20,30,.92)";
+    rr(c, bx, clH - 44, bw, 32, 16);
+    c.fill();
+    txt(c, "HIZ SINIRI " + SET.limit, clW / 2, clH - 28, "700 15px ".concat(css("--f-num")), "#fff");
+    c.restore();
+  }
+}
+function setTheme(k, sweep = true) {
+  THEME = k;
+  try {
+    localStorage.setItem("mgmk.theme", k);
+  } catch (e) {
+  }
+  const t = THEMES.find((x) => x.k === k);
+  document.querySelectorAll(".th-chip").forEach((b) => b.setAttribute("aria-pressed", b.dataset.t === k ? "true" : "false"));
+  $("classic").hidden = k !== "temel";
+  $("clusterWrap").hidden = k === "temel";
+  if ($("btnMirror")) $("btnMirror").hidden = k !== "hud";
+  if (t && t.font && document.fonts) document.fonts.load('400 20px "'.concat(t.font, '"')).catch(() => {
+  });
+  requestAnimationFrame(() => {
+    resizeCluster();
+    resizeDial();
+  });
+  if (sweep && k !== "temel") sweepAt = performance.now();
+}
+function buildThemeBar() {
+  $("themeBar").innerHTML = THEMES.map((t) => '<button class="th-chip" type="button" data-t="'.concat(t.k, '" aria-pressed="false">').concat(t.name, "</button>")).join("") + '<span class="spacer"></span><button class="btn" id="btnMirror" type="button" hidden>Ayna: kapalı</button><button class="btn" id="btnFocus" type="button">Tam ekran</button>';
+  $("btnMirror").addEventListener("click", () => {
+    SET.hudMirror = !SET.hudMirror;
+    saveSet();
+    mirrorTxt();
+  });
+  mirrorTxt();
+  document.querySelectorAll(".th-chip").forEach((b) => b.addEventListener("click", () => setTheme(b.dataset.t)));
+  $("btnFocus").addEventListener("click", enterFocus);
+}
+function mirrorTxt() {
+  const b = $("btnMirror");
+  if (b) b.textContent = "Ayna: " + (SET.hudMirror ? "açık" : "kapalı");
+}
+function enterFocus() {
+  if (window.MGMNative) try {
+    MGMNative.landscape(true);
+  } catch (e) {
+  }
+  if (THEME === "temel") setTheme("luks");
+  document.body.classList.add("focus");
+  try {
+    const el = document.documentElement;
+    if (el.requestFullscreen) el.requestFullscreen().catch(() => {
+    });
+  } catch (e) {
+  }
+  try {
+    screen.orientation && screen.orientation.lock && screen.orientation.lock("landscape").catch(() => {
+    });
+  } catch (e) {
+  }
+  setTimeout(resizeCluster, 120);
+}
+function exitFocus() {
+  if (window.MGMNative) try {
+    MGMNative.landscape(false);
+  } catch (e) {
+  }
+  document.body.classList.remove("focus");
+  try {
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {
+    });
+  } catch (e) {
+  }
+  setTimeout(resizeCluster, 120);
+}
+const odoNow = () => SET.odo > 0 ? SET.odo + LEARN.km : null;
+const todayISO = () => (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+const daysBetween = (a, b) => Math.round((new Date(b) - new Date(a)) / 864e5);
+const fmtDate = (iso) => {
+  if (!iso) return "--";
+  const d = new Date(iso);
+  return d.toLocaleDateString("tr-TR", { day: "2-digit", month: "short", year: "numeric" });
+};
+const tl = (v) => v == null || isNaN(v) ? "--" : v.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " ₺";
+const MNT_DEF = [
+  { k: "yag", name: "Motor yağı ve yağ filtresi", km: 15e3, ay: 12 },
+  { k: "hava", name: "Hava filtresi", km: 3e4, ay: 24 },
+  { k: "polen", name: "Polen filtresi", km: 15e3, ay: 12 },
+  { k: "yakitf", name: "Yakıt filtresi", km: 4e4, ay: 36, dzKm: 3e4 },
+  { k: "buji", name: "Bujiler", km: 4e4, ay: 48, notDz: true },
+  { k: "triger", name: "Triger seti / zincir kontrolü", km: 9e4, ay: 60 },
+  { k: "balata", name: "Fren balataları (kontrol)", km: 2e4, ay: 12 },
+  { k: "hidrolik", name: "Fren hidroliği", km: 0, ay: 24 },
+  { k: "antifriz", name: "Antifriz", km: 6e4, ay: 48 },
+  { k: "aku", name: "Akü testi", km: 0, ay: 12 },
+  { k: "lpgf", name: "LPG filtreleri", km: 1e4, ay: 12, onlyLpg: true },
+  { k: "muayene", name: "Araç muayenesi", km: 0, ay: 24, date: true },
+  { k: "trafik", name: "Trafik sigortası", km: 0, ay: 12, date: true },
+  { k: "kasko", name: "Kasko", km: 0, ay: 12, date: true }
+];
+const DEF_MNT = { items: {} };
+let MNT = load("mgmk.mnt", DEF_MNT);
+const saveMnt = () => store("mgmk.mnt", MNT);
+if (SET.svcKm > 0 && !MNT.items.yag) {
+  MNT.items.yag = { km: SET.svcKm, intKm: SET.svcInt || 15e3 };
+  saveMnt();
+}
+function mntList() {
+  const fuel = effFuel();
+  return MNT_DEF.filter((d) => !(d.notDz && fuel === "dizel") && !(d.onlyLpg && fuel !== "lpg"));
+}
+function mntState(d) {
+  var _a, _b;
+  const it = MNT.items[d.k] || {}, baseKm = effFuel() === "dizel" && d.dzKm ? d.dzKm : d.km, intKm = (_a = it.intKm) != null ? _a : baseKm, intAy = (_b = it.intAy) != null ? _b : d.ay;
+  const odo = odoNow();
+  let kmLeft = null, dayLeft = null;
+  if (intKm && it.km != null && odo != null) kmLeft = it.km + intKm - odo;
+  if (intAy && it.date) {
+    const due = new Date(it.date);
+    due.setMonth(due.getMonth() + intAy);
+    dayLeft = daysBetween(todayISO(), due.toISOString().slice(0, 10));
+  }
+  let sev = "na";
+  if (kmLeft != null || dayLeft != null) {
+    sev = "ok";
+    if (kmLeft != null && kmLeft < Math.max(1e3, intKm * 0.08) || dayLeft != null && dayLeft < 30) sev = "info";
+    if (kmLeft != null && kmLeft < 0 || dayLeft != null && dayLeft < 0) sev = "warn";
+    if (d.date && dayLeft != null && dayLeft < 0) sev = "crit";
+  }
+  return { it, intKm, intAy, kmLeft, dayLeft, sev };
+}
+function mntDiag() {
+  for (const d of MNT_DEF) drop("mnt-" + d.k);
+  drop("svc");
+  for (const d of mntList()) {
+    const s = mntState(d);
+    if (s.sev === "ok" || s.sev === "na") continue;
+    const parts = [];
+    if (s.kmLeft != null) parts.push(s.kmLeft < 0 ? fmt(-s.kmLeft) + " km gecikti" : fmt(s.kmLeft) + " km kaldı");
+    if (s.dayLeft != null) parts.push(s.dayLeft < 0 ? -s.dayLeft + " gün gecikti" : s.dayLeft + " gün kaldı");
+    const late = s.sev !== "info";
+    put({
+      id: "mnt-" + d.k,
+      sys: "bakim",
+      sev: s.sev,
+      title: d.name + (late ? d.date ? " süresi geçti" : " zamanı geçti" : " yaklaşıyor"),
+      ev: parts.join(" · "),
+      causes: [d.date ? "Belge / poliçe süresi dolar" : "Periyodik bakım aralığı"],
+      acts: [d.date ? d.k === "muayene" ? "Randevu alın; süresi geçen muayenede gecikme cezası uygulanır" : "Poliçeyi yenileyin; sigortasız araç trafiğe çıkamaz" : "Bakım sekmesinden yapıldı olarak işaretleyin"],
+      when: late ? "Bu hafta" : "Yakında",
+      tab: "bakim"
+    });
+  }
+}
+function renderMnt() {
+  const odo = odoNow();
+  $("mOdo").value = odo != null ? Math.round(odo) : "";
+  $("mntList").innerHTML = mntList().map((d) => {
+    var _a, _b;
+    const s = mntState(d), it = s.it;
+    const st = s.sev === "na" ? "Bilgi girilmedi" : [s.kmLeft != null ? s.kmLeft < 0 ? fmt(-s.kmLeft) + " km gecikti" : fmt(s.kmLeft) + " km kaldı" : null, s.dayLeft != null ? s.dayLeft < 0 ? -s.dayLeft + " gün gecikti" : s.dayLeft + " gün kaldı" : null].filter(Boolean).join(" · ");
+    const chip = { na: ["na", "Yok"], ok: ["ok", "Tamam"], info: ["info", "Yaklaşıyor"], warn: ["warn", "Gecikti"], crit: ["crit", "Süresi geçti"] }[s.sev];
+    return '<div class="mnt">\n      <div class="mh"><b>'.concat(d.name, '</b><span class="chip ').concat(chip[0], '">').concat(chip[1], '</span></div>\n      <div class="ms">').concat(st).concat(s.intKm ? " · her " + fmt(s.intKm) + " km" : "").concat(s.intAy ? " / " + s.intAy + " ay" : "", '</div>\n      <div class="mf">\n        ').concat(d.date ? "" : '<label>Son km<input type="number" min="0" step="1" data-mk="'.concat(d.k, '" data-f="km" value="').concat((_a = it.km) != null ? _a : "", '"></label>'), "\n        <label>").concat(d.date ? "Son yapıldığı / başlangıç" : "Son tarih", '<input type="date" data-mk="').concat(d.k, '" data-f="date" value="').concat((_b = it.date) != null ? _b : "", '"></label>\n        <button class="btn" type="button" data-done="').concat(d.k, '">Bugün yapıldı</button>\n      </div></div>');
+  }).join("");
+  document.querySelectorAll("[data-mk]").forEach((el) => el.addEventListener("change", () => {
+    const it = MNT.items[el.dataset.mk] || (MNT.items[el.dataset.mk] = {});
+    if (el.dataset.f === "km") it.km = el.value === "" ? null : parseFloat(el.value);
+    else it.date = el.value || null;
+    saveMnt();
+    renderMnt();
+    mntDiag();
+    renderDiag(true);
+  }));
+  document.querySelectorAll("[data-done]").forEach((b) => b.addEventListener("click", () => {
+    const it = MNT.items[b.dataset.done] || (MNT.items[b.dataset.done] = {});
+    it.date = todayISO();
+    if (odoNow() != null) it.km = Math.round(odoNow());
+    saveMnt();
+    renderMnt();
+    mntDiag();
+    renderDiag(true);
+  }));
+}
+const MON_SPARK = ["Katalizör", "Isıtmalı katalizör", "Yakıt buharı (EVAP)", "İkincil hava", "", "Oksijen sensörü", "Oksijen sensörü ısıtıcı", "EGR / değişken supap"];
+const MON_DIESEL = ["NMHC katalizörü", "NOx / SCR", "", "Turbo basıncı", "", "Egzoz gazı sensörü", "Partikül filtresi (DPF)", "EGR / değişken supap"];
+function readiness() {
+  const b = S.ready;
+  if (!b || b.length < 4) return null;
+  const dz = !!(b[1] & 8), list = [];
+  [["Tekleme izleme", 0], ["Yakıt sistemi", 1], ["Bileşenler", 2]].forEach(([n, bit]) => {
+    if (b[1] & 1 << bit) list.push({ n, ok: !(b[1] & 1 << bit + 4) });
+  });
+  const names = dz ? MON_DIESEL : MON_SPARK;
+  for (let i = 0; i < 8; i++) if (names[i] && b[2] & 1 << i) list.push({ n: names[i], ok: !(b[3] & 1 << i) });
+  return { mil: !!(b[0] & 128), count: b[0] & 127, list, incomplete: list.filter((x) => !x.ok).length };
+}
+function renderReady() {
+  const r = readiness(), el = $("readyBox");
+  if (!r) {
+    el.innerHTML = '<div class="empty">Bağlandıktan sonra hazırlık testleri okunur. Kod sildiyseniz muayeneden önce buraya bakın.</div>';
+    return;
+  }
+  const ok = !r.mil && r.incomplete === 0, near = !r.mil && r.incomplete === 1;
+  const verdict = ok ? ["ok", "Muayeneye hazır", "Tüm hazırlık testleri tamamlanmış, arıza lambası sönük."] : r.mil ? ["crit", "Hazır değil: arıza lambası yanıyor", "Önce arızayı giderin; lamba yanarken emisyon muayenesinden geçmek zordur."] : near ? ["warn", "Neredeyse hazır", "1 test tamamlanmadı. Birkaç gün karışık sürüş (şehir + 15 dk sabit hızda yol) yapın."] : ["warn", "Hazır değil", "".concat(r.incomplete, " test tamamlanmadı. Kod yakın zamanda silindiyse 50–150 km karışık sürüş gerekir.")];
+  const clr = V("clrKm");
+  el.innerHTML = '<div class="ready-v '.concat(verdict[0], '"><b>').concat(verdict[1], "</b><span>").concat(verdict[2]).concat(clr != null ? " Kodlar silineli ".concat(fmt(clr), " km oldu.") : "", '</span></div>\n    <div class="ready-l">').concat(r.list.map((x) => '<div class="ready-i"><span class="chip '.concat(x.ok ? "ok" : "warn", '">').concat(x.ok ? "Tamam" : "Eksik", "</span>").concat(x.n, "</div>")).join(""), "</div>");
+}
+const FF_PIDS = [[4, "Motor yükü", "%", 0], [5, "Su sıcaklığı", "°C", 0], [12, "Devir", "d/dk", 0], [13, "Hız", "km/sa", 0], [6, "Kısa yakıt ayarı", "%", 1], [7, "Uzun yakıt ayarı", "%", 1], [11, "Emme basıncı", "kPa", 0], [15, "Emme havası", "°C", 0], [17, "Gaz pedalı", "%", 0]];
+function parseFF(resp, pid) {
+  if (!resp) return null;
+  const want = "42" + pid.toString(16).toUpperCase().padStart(2, "0") + "00";
+  for (const line of resp.replace(/ /g, "").toUpperCase().split(/[\r\n]+/)) {
+    const l = line.replace(/^[0-9A-F]{1,3}:/, ""), i = l.indexOf(want);
+    if (i < 0) continue;
+    const hex = l.slice(i + 6), out = [];
+    for (let j = 0; j + 1 < hex.length; j += 2) out.push(parseInt(hex.substr(j, 2), 16));
+    return out;
+  }
+  return null;
+}
+async function readFreeze() {
+  const ff = { at: now(), vals: [] };
+  const d = parseFF(await Elm.send("020200", 2500), 2);
+  if (!d || d.length < 2 || !(d[0] | d[1])) {
+    S.freeze = null;
+    return;
+  }
+  const c = d[0] << 8 | d[1];
+  ff.code = "PCBU"[c >> 14] + (c >> 12 & 3) + (c & 4095).toString(16).toUpperCase().padStart(3, "0");
+  for (const [pid, name, u, dd] of FF_PIDS) {
+    const b = parseFF(await Elm.send("02" + pid.toString(16).padStart(2, "0").toUpperCase() + "00", 1500), pid);
+    const def = PIDS.find((p) => p.pid === pid);
+    if (b && def && b.length >= def.n) ff.vals.push([name, def.f(...b), u, dd]);
+  }
+  S.freeze = ff;
+}
+function renderFreeze() {
+  const f = S.freeze, el = $("ffBox");
+  if (!f) {
+    el.innerHTML = "";
+    el.hidden = true;
+    return;
+  }
+  el.hidden = false;
+  el.innerHTML = '<div class="sec-h"><h2>Arıza anı verisi</h2><p>'.concat(f.code, ' kodu oluştuğu anda motor beyninin kaydettiği değerler</p></div>\n    <div class="live">').concat(f.vals.map(([n, v, u, d]) => '<div class="card"><div class="lbl"><span>'.concat(n, '</span></div><div class="val">').concat(fmt(v, d), "<small>").concat(u, "</small></div></div>")).join(""), '</div>\n    <p class="hint">Arızanın hangi koşulda çıktığını gösterir: soğuk motorda mı, rölantide mi, yükte mi.</p>');
+}
+const PERF_MODES = { a100: "0–100 km/sa", m400: "400 m", b100: "100–0 fren" };
+const PF = { mode: null, st: "idle", t0: 0, d: 0, lastT: 0, lastV: 0, msg: "" };
+let PERF_RES = load("mgmk.perf", { list: [] });
+function perfStart(mode) {
+  if (S.mode === "off") {
+    showMsg("Önce adaptöre bağlanın veya demoyu açın.");
+    return;
+  }
+  PF.mode = mode;
+  PF.st = "arm";
+  PF.d = 0;
+  PF.t0 = 0;
+  PF.res = null;
+  S.perfFast = true;
+  renderPerf();
+}
+function perfCancel() {
+  PF.mode = null;
+  PF.st = "idle";
+  S.perfFast = false;
+  renderPerf();
+}
+function perfSample(v, t) {
+  if (!PF.mode) {
+    PF.lastT = t;
+    PF.lastV = v;
+    return;
+  }
+  const dt = PF.lastT ? (t - PF.lastT) / 1e3 : 0, pv = PF.lastV;
+  const cross = (target) => PF.lastT + (t - PF.lastT) * clamp((target - pv) / (v - pv || 1e-6), 0, 1);
+  if (PF.mode === "a100" || PF.mode === "m400") {
+    if (PF.st === "arm") {
+      PF.msg = v < 1 ? "Hazır: gaza basınca ölçüm başlar" : "Önce tam durun";
+      if (v >= 1 && pv < 1 && PF.armedStop) {
+        PF.st = "run";
+        PF.t0 = cross(0.5);
+        PF.d = 0;
+      }
+      if (v < 1) PF.armedStop = true;
+    } else if (PF.st === "run") {
+      PF.d += (pv + v) / 2 / 3.6 * dt;
+      if (PF.mode === "a100" && v >= 100) perfDone((cross(100) - PF.t0) / 1e3, "s", "".concat(fmt(PF.d, 0), " m"));
+      if (PF.mode === "m400" && PF.d >= 400) perfDone((t - PF.t0) / 1e3, "s", "çıkış hızı ".concat(fmt(v), " km/sa"));
+      if (v < 1) {
+        PF.st = "arm";
+        PF.msg = "Ölçüm iptal: araç durdu";
+      }
+    }
+  } else if (PF.mode === "b100") {
+    if (PF.st === "arm") {
+      PF.msg = v >= 100 ? "Hazır: frene basınca ölçüm başlar" : "100 km/sa üstüne çıkın";
+      if (v >= 100) PF.armedHigh = true;
+      if (PF.armedHigh && pv >= 100 && v < 100) {
+        PF.st = "run";
+        PF.t0 = cross(100);
+        PF.d = 0;
+      }
+    } else if (PF.st === "run") {
+      PF.d += (pv + v) / 2 / 3.6 * dt;
+      if (v < 1) perfDone(PF.d, "m", "".concat(fmt((t - PF.t0) / 1e3, 1), " s"));
+      if (v > pv + 3) {
+        PF.st = "arm";
+        PF.armedHigh = false;
+        PF.msg = "Ölçüm iptal: araç hızlandı";
+      }
+    }
+  }
+  PF.lastT = t;
+  PF.lastV = v;
+}
+function perfDone(val, unit, extra) {
+  PF.st = "done";
+  PF.res = { mode: PF.mode, val, unit, extra, t: now() };
+  PERF_RES.list.unshift(PF.res);
+  PERF_RES.list = PERF_RES.list.slice(0, 30);
+  store("mgmk.perf", PERF_RES);
+  S.perfFast = false;
+  PF.armedStop = PF.armedHigh = false;
+  speak(PERF_MODES[PF.mode] + ": " + fmt(val, unit === "s" ? 2 : 1) + (unit === "s" ? " saniye" : " metre"));
+  renderPerf();
+}
+function renderPerf() {
+  var _a;
+  const live = $("perfLive");
+  if (!PF.mode) live.innerHTML = '<div class="empty">Bir ölçüm seçin. Ölçümleri sadece trafiğe kapalı, güvenli bir alanda yapın.</div>';
+  else {
+    const v = (_a = V("speed")) != null ? _a : 0, el = PF.st === "run" ? ((performance.now(), now()) - PF.t0) / 1e3 : 0;
+    live.innerHTML = '<div class="perf-live"><div><div class="lbl">'.concat(PERF_MODES[PF.mode], '</div><div class="perf-big">').concat(PF.st === "done" ? fmt(PF.res.val, PF.res.unit === "s" ? 2 : 1) + "<small>" + PF.res.unit + "</small>" : PF.st === "run" ? PF.mode === "b100" ? fmt(PF.d, 1) + "<small>m</small>" : fmt(el, 1) + "<small>s</small>" : fmt(v) + "<small>km/sa</small>", '</div>\n      <div class="perf-msg">').concat(PF.st === "done" ? "Bitti · " + esc(PF.res.extra) : PF.st === "run" ? "Ölçülüyor... " + fmt(v) + " km/sa" : esc(PF.msg || ""), '</div></div>\n      <button class="btn" type="button" id="btnPerfX">').concat(PF.st === "done" ? "Kapat" : "İptal", "</button></div>");
+    $("btnPerfX").addEventListener("click", perfCancel);
+  }
+  const best = {};
+  for (const r of PERF_RES.list) if (!best[r.mode] || r.val < best[r.mode].val) best[r.mode] = r;
+  $("perfBest").innerHTML = Object.keys(PERF_MODES).map((m) => '<div class="card"><div class="lbl"><span>En iyi '.concat(PERF_MODES[m], '</span></div><div class="val">').concat(best[m] ? fmt(best[m].val, best[m].unit === "s" ? 2 : 1) + "<small>" + best[m].unit + "</small>" : "--", '</div><div class="hint">').concat(best[m] ? fmtDate(new Date(best[m].t).toISOString()) : "Henüz ölçülmedi", "</div></div>")).join("");
+  $("perfHist").innerHTML = PERF_RES.list.length ? PERF_RES.list.slice(0, 10).map((r) => "<tr><td>".concat(fmtDate(new Date(r.t).toISOString()), "</td><td>").concat(PERF_MODES[r.mode], '</td><td class="num">').concat(fmt(r.val, r.unit === "s" ? 2 : 1), " ").concat(r.unit, "</td><td>").concat(esc(r.extra), "</td></tr>")).join("") : '<tr><td colspan="4" class="hint">Kayıt yok</td></tr>';
+}
+const DRV = { lastT: 0, lastV: 0, accAt: 0, brkAt: 0, win: [] };
+function drvSample(v, t) {
+  const tr = S.trip, ev = tr.ev || (tr.ev = { acc: 0, brk: 0, idle: 0, over: 0, rev: 0, maxSpd: 0 });
+  DRV.win.push([t, v]);
+  while (DRV.win.length && t - DRV.win[0][0] > 1200) DRV.win.shift();
+  if (DRV.win.length >= 2) {
+    const [t0, v0] = DRV.win[0], dts = (t - t0) / 1e3;
+    if (dts >= 0.7) {
+      const a = (v - v0) / dts;
+      if (a > 9 && t - DRV.accAt > 3e3) {
+        ev.acc++;
+        DRV.accAt = t;
+      }
+      if (a < -11 && t - DRV.brkAt > 3e3) {
+        ev.brk++;
+        DRV.brkAt = t;
+      }
+    }
+  }
+  ev.maxSpd = Math.max(ev.maxSpd, v);
+}
+function drvTick() {
+  var _a, _b;
+  const tr = S.trip, ev = tr.ev || (tr.ev = { acc: 0, brk: 0, idle: 0, over: 0, rev: 0, maxSpd: 0 });
+  const v = (_a = V("speed")) != null ? _a : 0, rpm = (_b = V("rpm")) != null ? _b : 0, dz = effFuel() === "dizel";
+  if (rpm > 400 && v < 1) ev.idle++;
+  if (SET.limit > 0 && v > SET.limit) ev.over++;
+  if (rpm > (dz ? 3800 : 5e3)) ev.rev++;
+  ev.cold = R.coldRev || 0;
+  if (SET.limit > 0 && v > SET.limit + 1) {
+    LIM.over = (LIM.over || 0) + 1;
+    if (LIM.over >= 2 && now() - (LIM.beepAt || 0) > 1e4) {
+      LIM.beepAt = now();
+      beep();
+    }
+  } else LIM.over = 0;
+}
+const LIM = {};
+let actx = null;
+function beep() {
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    const t = actx.currentTime;
+    for (let i = 0; i < 2; i++) {
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.frequency.value = 1500;
+      g.gain.setValueAtTime(1e-4, t + i * 0.22);
+      g.gain.exponentialRampToValueAtTime(0.4, t + i * 0.22 + 0.02);
+      g.gain.exponentialRampToValueAtTime(1e-4, t + i * 0.22 + 0.16);
+      o.connect(g).connect(actx.destination);
+      o.start(t + i * 0.22);
+      o.stop(t + i * 0.22 + 0.18);
+    }
+  } catch (e) {
+  }
+}
+document.addEventListener("click", () => {
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === "suspended") actx.resume();
+  } catch (e) {
+  }
+}, { once: true });
+function tripScore(tr) {
+  const ev = tr.ev || {}, min = Math.max(1, tr.sec / 60);
+  let s = 100 - (ev.acc || 0) * 4 - (ev.brk || 0) * 5 - (ev.over || 0) / 15 - (ev.rev || 0) / 10 - Math.min(10, (ev.cold || 0) / 6) - Math.max(0, (ev.idle || 0) / 60 / min * 100 - 15) * 0.4;
+  return Math.round(clamp(s, 0, 100));
+}
+function scoreTips(tr) {
+  const ev = tr.ev || {}, t = [];
+  if (ev.acc) t.push("".concat(ev.acc, " sert hızlanma"));
+  if (ev.brk) t.push("".concat(ev.brk, " sert fren"));
+  if (ev.over) t.push("".concat(Math.round(ev.over / 60), " dk hız sınırı üstü"));
+  if (ev.idle > 120) t.push("".concat(Math.round(ev.idle / 60), " dk rölanti"));
+  if (ev.cold > 5) t.push("soğuk motorda yüksek devir");
+  return t.length ? t.join(" · ") : "Temiz sürüş";
+}
+const GPS = { id: null, v: null, at: 0, n: 0, sum: 0, err: "" };
+function gpsToggle() {
+  if (GPS.id != null) {
+    navigator.geolocation.clearWatch(GPS.id);
+    GPS.id = null;
+    renderGps();
+    return;
+  }
+  if (!navigator.geolocation) {
+    GPS.err = "Bu tarayıcı konum vermiyor.";
+    renderGps();
+    return;
+  }
+  GPS.n = 0;
+  GPS.sum = 0;
+  GPS.err = "";
+  GPS.id = navigator.geolocation.watchPosition((p) => {
+    var _a;
+    GPS.at = now();
+    GPS.v = p.coords.speed != null && p.coords.speed >= 0 ? p.coords.speed * 3.6 : null;
+    const o = V("speed");
+    if (GPS.v != null && o != null && GPS.v > 30 && Math.abs(o - ((_a = GPS.lastO) != null ? _a : o)) < 3) {
+      GPS.n++;
+      GPS.sum += (o - GPS.v) / GPS.v * 100;
+    }
+    GPS.lastO = o;
+    renderGps();
+  }, (e) => {
+    GPS.err = e.code === 1 ? "Konum izni verilmedi. Bluefy ayarlarından konuma izin verin." : "Konum alınamadı.";
+    GPS.id = null;
+    renderGps();
+  }, { enableHighAccuracy: true, maximumAge: 0 });
+  renderGps();
+}
+function renderGps() {
+  const dev = GPS.n >= 5 ? GPS.sum / GPS.n : null;
+  $("gpsBox").innerHTML = '<div class="live">\n    <div class="card"><div class="lbl"><span>GPS hızı</span></div><div class="val">'.concat(GPS.v != null && now() - GPS.at < 5e3 ? fmt(GPS.v) : "--", '<small>km/sa</small></div></div>\n    <div class="card"><div class="lbl"><span>Araç (OBD) hızı</span></div><div class="val">').concat(fmt(V("speed")), '<small>km/sa</small></div></div>\n    <div class="card"><div class="lbl"><span>Sapma</span><span>').concat(GPS.n, ' örnek</span></div><div class="val">').concat(dev == null ? "--" : (dev > 0 ? "+" : "") + fmt(dev, 1), '<small>%</small></div></div></div>\n    <p class="hint">').concat(GPS.err ? esc(GPS.err) : dev == null ? "30 km/sa üstünde sabit hızda düz yolda sürün; 5 örnekten sonra sapma hesaplanır." : dev > 0 ? "Araç gerçek hızdan yaklaşık %".concat(fmt(dev, 1), " fazla gösteriyor. (Gösterge paneli genelde OBD hızından da biraz fazla gösterir.)") : "Araç gerçek hızdan yaklaşık %".concat(fmt(-dev, 1), " az gösteriyor. Lastik ölçüsünü kontrol edin."), "</p>");
+  $("btnGps").textContent = GPS.id != null ? "GPS'i durdur" : "GPS karşılaştırmayı başlat";
+}
+function tripRecord(tr) {
+  return {
+    t: tr.start,
+    min: Math.round(tr.sec / 60),
+    km: +tr.km.toFixed(1),
+    L: +tr.L.toFixed(2),
+    warm: tr.warm,
+    cost: SET.price > 0 ? +(tr.L * SET.price).toFixed(2) : null,
+    avg: tr.km > 0.3 ? +(tr.L / tr.km * 100).toFixed(1) : null,
+    maxSpd: Math.round(tr.ev && tr.ev.maxSpd || 0),
+    score: tripScore(tr),
+    tips: scoreTips(tr)
+  };
+}
+function renderTrips() {
+  var _a;
+  const cur = S.trip, live = S.mode !== "off" && cur.sec > 5;
+  const cs = tripScore(cur);
+  $("tripNow").innerHTML = live ? '<div class="live">\n      <div class="card"><div class="lbl"><span>Şu anki yolculuk</span></div><div class="val">'.concat(fmt(cur.km, 1), '<small>km</small></div><div class="hint">').concat(Math.floor(cur.sec / 60), ' dk</div></div>\n      <div class="card"><div class="lbl"><span>Maliyet</span></div><div class="val">').concat(SET.price > 0 ? tl(cur.L * SET.price) : "--", '</div><div class="hint">').concat(fmt(cur.L, 2), " L").concat(SET.price > 0 ? "" : " · fiyatı Ayarlar'dan girin", '</div></div>\n      <div class="card"><div class="lbl"><span>Sürüş puanı</span></div><div class="val" style="color:').concat(cs >= 80 ? "var(--ok)" : cs >= 60 ? "var(--warn)" : "var(--crit)", '">').concat(cs, '<small>/100</small></div><div class="hint">').concat(esc(scoreTips(cur)), '</div></div>\n      <div class="card"><div class="lbl"><span>Km başına</span></div><div class="val">').concat(SET.price > 0 && cur.km > 0.3 ? tl(cur.L * SET.price / cur.km) : "--", '</div><div class="hint">ortalama ').concat(cur.km > 0.3 ? fmt(cur.L / cur.km * 100, 1) : "--", " L/100</div></div></div>") : '<div class="empty">Bağlanınca bu yolculuğun km, yakıt, maliyet ve sürüş puanı burada canlı görünür.</div>';
+  const months = [];
+  const d0 = /* @__PURE__ */ new Date();
+  d0.setDate(1);
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(d0.getFullYear(), d0.getMonth() - i, 1);
+    months.push({ y: d.getFullYear(), m: d.getMonth(), km: 0, L: 0, cost: 0, n: 0 });
+  }
+  for (const t of LEARN.trips) {
+    const d = new Date(t.t), mo = months.find((x) => x.y === d.getFullYear() && x.m === d.getMonth());
+    if (mo) {
+      mo.km += t.km || 0;
+      mo.L += t.L || 0;
+      mo.cost += (_a = t.cost) != null ? _a : SET.price > 0 ? (t.L || 0) * SET.price : 0;
+      mo.n++;
+    }
+  }
+  const thisM = months[5];
+  $("monthSum").innerHTML = '<div class="live">\n    <div class="card"><div class="lbl"><span>Bu ay yol</span></div><div class="val">'.concat(fmt(thisM.km, 0), '<small>km</small></div><div class="hint">').concat(thisM.n, ' yolculuk</div></div>\n    <div class="card"><div class="lbl"><span>Bu ay yakıt</span></div><div class="val">').concat(fmt(thisM.L, 1), '<small>L</small></div><div class="hint">').concat(thisM.km > 1 ? fmt(thisM.L / thisM.km * 100, 1) + " L/100 ortalama" : "--", '</div></div>\n    <div class="card"><div class="lbl"><span>Bu ay maliyet</span></div><div class="val">').concat(SET.price > 0 || thisM.cost ? tl(thisM.cost) : "--", '</div><div class="hint">').concat(SET.price > 0 ? "litre " + tl(SET.price) : "Yakıt fiyatını Ayarlar'dan girin", '</div></div></div>\n    <canvas id="monthCv" class="mchart" aria-label="Son 6 ay maliyet grafiği"></canvas>');
+  requestAnimationFrame(() => monthChart($("monthCv"), months));
+  const list = LEARN.trips.slice().reverse().slice(0, 20);
+  $("tripList").innerHTML = list.length ? list.map((t) => {
+    var _a2;
+    return "<tr><td>".concat(new Date(t.t).toLocaleString("tr-TR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }), '</td><td class="num">').concat(fmt(t.km, 1), '</td><td class="num">').concat(t.min, '</td><td class="num">').concat(t.avg != null ? fmt(t.avg, 1) : "--", '</td><td class="num">').concat(t.cost != null ? tl(t.cost) : SET.price > 0 && t.L ? tl(t.L * SET.price) : "--", '</td><td class="num">').concat((_a2 = t.score) != null ? _a2 : "--", "</td></tr>");
+  }).join("") : '<tr><td colspan="6" class="hint">Henüz kayıtlı yolculuk yok</td></tr>';
+}
+function monthChart(cv, months) {
+  if (!cv) return;
+  const r = cv.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
+  if (!r.width) return;
+  cv.width = r.width * dpr;
+  cv.height = r.height * dpr;
+  const c = cv.getContext("2d");
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const w = r.width, h = r.height, useCost = SET.price > 0, vals = months.map((m) => useCost ? m.cost : m.km), mx = Math.max(1, ...vals);
+  const L = 8, B = 22, T = 18, bw = (w - L * 2) / 6;
+  c.clearRect(0, 0, w, h);
+  c.strokeStyle = css("--line");
+  c.beginPath();
+  c.moveTo(L, h - B + 0.5);
+  c.lineTo(w - L, h - B + 0.5);
+  c.stroke();
+  months.forEach((m, i) => {
+    const x = L + i * bw + bw * 0.2, bh = vals[i] / mx * (h - B - T);
+    c.fillStyle = i === 5 ? css("--accent") : css("--panel2");
+    c.fillRect(x, h - B - bh, bw * 0.6, bh);
+    c.fillStyle = css("--muted");
+    c.font = "500 11px ".concat(css("--f-ui"));
+    c.textAlign = "center";
+    c.textBaseline = "alphabetic";
+    c.fillText(new Date(m.y, m.m, 1).toLocaleDateString("tr-TR", { month: "short" }), x + bw * 0.3, h - 6);
+    if (vals[i] > 0) {
+      c.fillStyle = css("--fg");
+      c.fillText(useCost ? Math.round(vals[i]) + " ₺" : Math.round(vals[i]) + " km", x + bw * 0.3, h - B - bh - 5);
+    }
+  });
+}
+function tripsCsv() {
+  var _a, _b, _c, _d, _e, _f;
+  const rows = [["tarih", "sure_dk", "km", "yakit_L", "ort_L100", "maliyet_TL", "max_hiz", "surus_puani", "notlar"]];
+  for (const t of LEARN.trips) rows.push([new Date(t.t).toISOString(), t.min, t.km, (_a = t.L) != null ? _a : "", (_b = t.avg) != null ? _b : "", (_c = t.cost) != null ? _c : SET.price > 0 && t.L ? (t.L * SET.price).toFixed(2) : "", (_d = t.maxSpd) != null ? _d : "", (_e = t.score) != null ? _e : "", (_f = t.tips) != null ? _f : ""]);
+  return rows.map((r) => r.map((x) => /[;"\n]/.test(String(x)) ? '"'.concat(String(x).replace(/"/g, '""'), '"') : x).join(";")).join("\n");
+}
+const REC = { on: false, rows: [] };
+const REC_KEYS = ["speed", "rpm", "cool", "load", "thr", "map", "maf", "iat", "stft", "ltft", "batt", "l100", "fuel", "oil", "boost"];
+function recTick() {
+  if (!REC.on) return;
+  REC.rows.push([(/* @__PURE__ */ new Date()).toISOString(), ...REC_KEYS.map((k) => V(k) == null ? "" : +V(k).toFixed(2))]);
+  if (REC.rows.length > 14400) REC.rows.shift();
+  $("recInfo").textContent = REC.rows.length + " satır kaydedildi";
+}
+const recCsv = () => [["zaman", ...REC_KEYS].join(";"), ...REC.rows.map((r) => r.join(";"))].join("\n");
+async function shareText(text, name, msgEl) {
+  const m = $(msgEl);
+  if (window.MGMNative) {
+    MGMNative.share(text, name);
+    m.textContent = "Paylaşım penceresi açıldı";
+    return;
+  }
+  try {
+    if (navigator.canShare && window.File) {
+      const f = new File([text], name, { type: "text/csv" });
+      if (navigator.canShare({ files: [f] })) {
+        await navigator.share({ files: [f], title: name });
+        m.textContent = "Paylaşıldı";
+        return;
+      }
+    }
+  } catch (e) {
+    if (e && e.name === "AbortError") return;
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    m.textContent = "Panoya kopyalandı: Notlar veya e-postaya yapıştırabilirsiniz";
+  } catch (e) {
+    const ta = $(msgEl + "Ta");
+    ta.hidden = false;
+    ta.value = text;
+    ta.select();
+    m.textContent = "Kopyalamak için metni seçili tutup Kopyala'ya dokunun";
+  }
+}
+const SUN = [[8.3, 17.5], [7.9, 18.1], [7.2, 18.6], [6.5, 19.2], [5.9, 19.8], [5.6, 20.2], [5.8, 20.2], [6.3, 19.7], [6.8, 19], [7.3, 18.3], [7.9, 17.6], [8.3, 17.3]];
+let dayTheme = null;
+function isNight() {
+  const d = /* @__PURE__ */ new Date(), h = d.getHours() + d.getMinutes() / 60, [r, s] = SUN[d.getMonth()];
+  return h < r || h > s + 0.3;
+}
+let nightState = null;
+function autoNightTick() {
+  if (!SET.autoNight) {
+    if (dayTheme) {
+      setTheme(dayTheme, false);
+      dayTheme = null;
+    }
+    nightState = null;
+    return;
+  }
+  const night = isNight();
+  if (night === nightState) return;
+  nightState = night;
+  if (night) {
+    if (THEME !== SET.autoNight) {
+      dayTheme = THEME;
+      setTheme(SET.autoNight, false);
+    }
+  } else if (dayTheme) {
+    setTheme(dayTheme, false);
+    dayTheme = null;
+  }
+}
+const SLOT_DEFS = {
+  cool: { name: "Su sıcaklığı", lbl: "SU", get: (D) => [n0(D.cool), "°C", D.cool == null ? null : (D.cool - 50) / 80, D.cool >= 105] },
+  oil: { name: "Yağ sıcaklığı", lbl: "YAĞ", get: () => [n0(V("oil")), "°C", V("oil") == null ? null : (V("oil") - 50) / 90, V("oil") >= 130] },
+  fuel: { name: "Yakıt seviyesi", lbl: "YAKIT", get: (D) => [n0(D.fuel), "%", D.fuel == null ? null : D.fuel / 100, D.fuel != null && D.fuel < 12] },
+  batt: { name: "Akü voltajı", lbl: "AKÜ", get: (D) => [n1(D.batt), "V", D.batt == null ? null : (D.batt - 11) / 4, false] },
+  l100: { name: "Anlık tüketim", lbl: "ANLIK", get: (D) => [n1(D.l100), "L/100", D.l100 == null ? null : D.l100 / 20, false] },
+  avg: { name: "Ortalama tüketim", lbl: "ORTALAMA", get: (D) => [n1(D.avg), "L/100", D.avg == null ? null : D.avg / 20, false] },
+  boost: { name: "Turbo basıncı", lbl: "TURBO", get: (D) => [D.boost == null ? "--" : fmt(D.boost, 2), "bar", D.boost == null ? null : (D.boost + 0.8) / 2.6, false] },
+  iat: { name: "Emme havası", lbl: "EMME", get: () => [n0(V("iat")), "°C", null, false] },
+  amb: { name: "Dış hava", lbl: "DIŞ", get: (D) => [n0(D.amb), "°C", null, D.amb != null && D.amb <= 3] },
+  load: { name: "Motor yükü", lbl: "YÜK", get: (D) => [n0(D.load), "%", D.load == null ? null : D.load / 100, false] },
+  thr: { name: "Gaz pedalı", lbl: "GAZ", get: (D) => [n0(D.thr), "%", D.thr == null ? null : D.thr / 100, false] },
+  km: { name: "Yolculuk km", lbl: "YOLCULUK", get: (D) => [n1(D.km), "km", null, false] },
+  cost: { name: "Yolculuk maliyeti", lbl: "MALİYET", get: () => [SET.price > 0 ? fmt(S.trip.L * SET.price, 2) : "--", "₺", null, false] },
+  score: { name: "Sürüş puanı", lbl: "PUAN", get: () => [String(tripScore(S.trip)), "/100", tripScore(S.trip) / 100, tripScore(S.trip) < 60] },
+  clock: { name: "Saat", lbl: "SAAT", get: () => [clock(), "", null, false] }
+};
+const DEF_SLOTS = ["cool", "fuel", "l100", "batt"];
+function slotData(D) {
+  return (SET.slots && SET.slots.length === 4 ? SET.slots : DEF_SLOTS).map((k) => {
+    const d = SLOT_DEFS[k] || SLOT_DEFS.cool, [v, u, f, bad] = d.get(D);
+    return { k, lbl: d.lbl, name: d.name, v, u, f, bad };
+  });
+}
+function sysState(k) {
+  const fs = [...F.values()].filter((f) => f.sys === k);
+  const pen = fs.reduce((a, f) => a + (SEV_W[f.sev] || 0), 0);
+  const worst = fs.some((f) => f.sev === "crit") ? "crit" : fs.some((f) => f.sev === "warn") ? "warn" : fs.some((f) => f.sev === "info") ? "info" : "ok";
+  return { score: Math.max(0, 100 - pen), worst, fs };
+}
+function sysHasData(k) {
+  const has = (x) => V(x) != null;
+  switch (k) {
+    case "aku":
+      return has("batt") || has("ecuV") || LEARN.crank.length > 0;
+    case "sogutma":
+      return has("cool");
+    case "karisim":
+      return effFuel() === "dizel" ? false : has("stft") || has("ltft");
+    case "atesleme":
+      return has("rpm");
+    case "hava":
+      return has("map") || has("maf");
+    case "egzoz":
+      return has("o2a") || has("dpfT") || has("egrE") || LEARN.trips.length >= 6;
+    case "kod":
+      return S.dtc.read;
+    case "bakim":
+      return true;
+  }
+  return false;
+}
+let diagSig = "";
+function renderDiag(force) {
+  const list = [...F.values()].sort((a, b) => (SEV_W[b.sev] || 0) - (SEV_W[a.sev] || 0) || a.at - b.at);
+  const nAct = list.filter((f) => f.sev !== "info").length, nCrit = list.filter((f) => f.sev === "crit").length;
+  const nf = $("nFind");
+  nf.hidden = nAct === 0;
+  nf.textContent = nAct;
+  nf.className = "n" + (nCrit ? " c" : "");
+  const sts = SYS.map((s) => ({ ...s, ...sysState(s.k), data: sysHasData(s.k) }));
+  const withData = sts.filter((s) => s.data);
+  const avg = withData.length ? withData.reduce((a, s) => a + s.score, 0) / withData.length : null;
+  const minS = withData.length ? Math.min(...withData.map((s) => s.score)) : null;
+  const score = avg == null ? null : Math.round(avg * 0.6 + minS * 0.4);
+  $("hcScore").textContent = score == null ? "--" : score;
+  $("hcScore").style.color = score == null ? "" : score >= 85 ? css("--ok") : score >= 60 ? css("--warn") : css("--crit");
+  $("hcTitle").textContent = "Araç sağlığı";
+  const parts = [nCrit && nCrit + " acil", nAct - nCrit && nAct - nCrit + " dikkat", list.length - nAct && list.length - nAct + " bilgi"].filter(Boolean);
+  $("hcSub").textContent = list.length ? parts.join(", ") + " · ayrıntılar için dokunun" : S.mode === "off" ? "Bağlanınca analiz başlar" : "Sorun görünmüyor";
+  renderCockpit();
+  if ($("v-teshis").hidden && !force) return;
+  const sig = JSON.stringify(list.map((f) => [f.id, f.sev, f.ev])) + score + sts.map((s) => s.data).join();
+  if (sig === diagSig && !force) return;
+  diagSig = sig;
+  drawScore(score);
+  $("scTitle").textContent = score == null ? "Araç sağlığı" : score >= 85 ? "Araç iyi durumda" : score >= 60 ? "Dikkat gereken noktalar var" : "Acil ilgilenin";
+  $("scSub").textContent = S.mode === "demo" ? "Demo verisi, örnek bulgular" : withData.length + " / " + SYS.length + " sistem için veri var";
+  $("systems").innerHTML = sts.map((s) => {
+    const st = !s.data ? "na" : s.worst;
+    const txt2 = !s.data ? "Veri yok" : SEV_TXT[s.worst];
+    const sub = !s.data ? s.k === "karisim" && effFuel() === "dizel" ? "Dizelde yakıt ayarı izlenmez" : "Araç bu değeri vermiyor veya henüz ölçülmedi" : s.fs.length ? s.fs.map((f) => f.title).join(" · ") : "Ölçülen değerler normal";
+    return '<div class="sys"><div class="h">'.concat(s.name, "<span>").concat(s.data ? s.score : "--", '</span></div><div><span class="chip ').concat(st, '">').concat(txt2, '</span></div><div class="s">').concat(esc(sub), "</div></div>");
+  }).join("");
+  $("finds").innerHTML = list.length ? list.map((f) => '\n    <article class="find '.concat(f.sev, '">\n      <div class="fh"><span class="chip ').concat(f.sev, '">').concat(SEV_TXT[f.sev], "</span><b>").concat(esc(f.title), '</b><span class="when">Ne zaman: <b>').concat(esc(f.when), '</b></span></div>\n      <div class="ev">').concat(esc(f.ev), '</div>\n      <div class="cols">\n        <div><h4>Olası nedenler</h4><ul>').concat(f.causes.map((c) => "<li>".concat(esc(c), "</li>")).join(""), "</ul></div>\n        <div><h4>Ne yapmalı</h4><ul>").concat(f.acts.map((c) => "<li>".concat(esc(c), "</li>")).join(""), "</ul></div>\n      </div>\n      ").concat(f.tab ? '<div><button class="btn" type="button" data-go="'.concat(f.tab, '">').concat(f.tab === "bakim" ? "Bakım defterine git" : "Arıza kodlarına git", "</button></div>") : "", "\n    </article>")).join("") : '<div class="empty">'.concat(S.mode === "off" ? "Adaptöre bağlanın veya demoyu açın. Uygulama sürüş sırasında değerleri izleyip olası arızaları burada listeler." : "Şu ana kadar bir sorun bulunmadı. Uygulama sürdükçe öğrenir; ilk yolculuklarda bulgu çıkmaması normaldir.", "</div>");
+  document.querySelectorAll("[data-go]").forEach((b) => b.addEventListener("click", () => showView(b.dataset.go)));
+  renderLearn();
+}
+function drawScore(score) {
+  const cv = $("scoreCv"), c = cv.getContext("2d"), W = cv.width, cx = W / 2, r = W * 0.4;
+  c.clearRect(0, 0, W, W);
+  c.lineWidth = W * 0.07;
+  c.lineCap = "round";
+  c.strokeStyle = css("--panel2");
+  c.beginPath();
+  c.arc(cx, cx, r, 0, Math.PI * 2);
+  c.stroke();
+  if (score != null) {
+    c.strokeStyle = score >= 85 ? css("--ok") : score >= 60 ? css("--warn") : css("--crit");
+    c.beginPath();
+    c.arc(cx, cx, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * score / 100);
+    c.stroke();
+  }
+  c.fillStyle = css("--fg");
+  c.textAlign = "center";
+  c.textBaseline = "middle";
+  c.font = "700 ".concat(W * 0.28, "px ").concat(css("--f-num"));
+  c.fillText(score == null ? "--" : String(score), cx, cx - W * 0.02);
+  c.fillStyle = css("--muted");
+  c.font = "500 ".concat(W * 0.07, "px ").concat(css("--f-ui"));
+  c.fillText("/ 100", cx, cx + W * 0.17);
+}
+function spark(cv, arr, col, opts = {}) {
+  var _a, _b;
+  const r = cv.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
+  if (!r.width) return;
+  cv.width = r.width * dpr;
+  cv.height = r.height * dpr;
+  const c = cv.getContext("2d");
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const w = r.width, h = r.height;
+  c.clearRect(0, 0, w, h);
+  if (!arr || arr.length < 2) return;
+  let lo = (_a = opts.lo) != null ? _a : Math.min(...arr), hi = (_b = opts.hi) != null ? _b : Math.max(...arr);
+  if (hi - lo < 1e-6) {
+    hi += 1;
+    lo -= 1;
+  }
+  const X = (i) => i / (arr.length - 1) * (w - 6) + 3, Y = (x) => h - 3 - (x - lo) / (hi - lo) * (h - 6);
+  if (opts.ref != null) {
+    c.strokeStyle = css("--line");
+    c.setLineDash([3, 3]);
+    c.beginPath();
+    c.moveTo(0, Y(opts.ref));
+    c.lineTo(w, Y(opts.ref));
+    c.stroke();
+    c.setLineDash([]);
+  }
+  c.beginPath();
+  arr.forEach((x, i) => i ? c.lineTo(X(i), Y(x)) : c.moveTo(X(i), Y(x)));
+  c.strokeStyle = col;
+  c.lineWidth = 1.6;
+  c.stroke();
+  c.lineTo(X(arr.length - 1), h);
+  c.lineTo(X(0), h);
+  c.closePath();
+  c.globalAlpha = 0.12;
+  c.fillStyle = col;
+  c.fill();
+  c.globalAlpha = 1;
+  c.fillStyle = col;
+  c.beginPath();
+  c.arc(X(arr.length - 1), Y(arr[arr.length - 1]), 2.6, 0, Math.PI * 2);
+  c.fill();
+}
+function renderLearn() {
+  const norm = LEARN.coolN > 60 ? LEARN.coolSum / LEARN.coolN : null;
+  const cr = LEARN.crank.slice(-10), wm = LEARN.warm.slice(-8), tr = LEARN.trips.slice(-10);
+  $("learn").innerHTML = '\n    <div class="card"><div class="lbl"><span>Marşta en düşük akü voltajı</span><span>'.concat(cr.length, ' marş</span></div><div class="val">').concat(cr.length ? fmt(cr[cr.length - 1].min, 1) : "--", '<small>V son</small></div><canvas id="lnCr"></canvas></div>\n    <div class="card"><div class="lbl"><span>Isınma süresi (80 °C)</span><span>').concat(wm.length, ' kayıt</span></div><div class="val">').concat(wm.length ? fmt(wm[wm.length - 1].min, 0) : "--", '<small>dk son</small></div><canvas id="lnWm"></canvas></div>\n    <div class="card"><div class="lbl"><span>Normal çalışma sıcaklığı</span><span>').concat(LEARN.coolN, ' örnek</span></div><div class="val">').concat(norm ? fmt(norm, 0) : "--", '<small>°C</small></div><canvas id="lnCo"></canvas></div>\n    <div class="card"><div class="lbl"><span>Yolculuk süreleri</span><span>').concat(tr.length, ' yolculuk</span></div><div class="val">').concat(tr.length ? fmt(tr.reduce((a, x) => a + x.min, 0) / tr.length, 0) : "--", '<small>dk ortalama</small></div><canvas id="lnTr"></canvas></div>');
+  requestAnimationFrame(() => {
+    spark($("lnCr"), cr.map((x) => x.min), css("--warn"), { ref: 10, lo: 8.8, hi: 11.2 });
+    spark($("lnWm"), wm.map((x) => x.min), css("--info"), { ref: effFuel() === "dizel" ? 20 : 15, lo: 0 });
+    spark($("lnCo"), S.hist.cool || [], css("--accent"), { ref: norm != null ? norm : void 0 });
+    spark($("lnTr"), tr.map((x) => x.min), css("--ok"), { ref: 12, lo: 0 });
+  });
+}
+function renderDtc() {
+  const d = S.dtc, all = [...d.stored.map((c) => [c, "Kayıtlı"]), ...d.pending.filter((c) => !d.stored.includes(c)).map((c) => [c, "Bekleyen"]), ...d.perm.filter((c) => !d.stored.includes(c)).map((c) => [c, "Kalıcı"])];
+  const nd = $("nDtc");
+  nd.hidden = !all.length;
+  nd.textContent = all.length;
+  $("milPill").className = "pill " + (d.mil ? "busy" : d.read ? "on" : "");
+  $("milTxt").textContent = "Arıza lambası: " + (!d.read ? "bilinmiyor" : d.mil ? "yanıyor" : "sönük");
+  $("dtcInfo").textContent = !d.read ? "Henüz okunmadı." : all.length ? "".concat(all.length, " kod · ").concat(new Date(d.at).toLocaleTimeString("tr-TR").slice(0, 5), " itibarıyla").concat(S.mode === "demo" ? " (demo)" : "") : "Kod yok.";
+  $("dtcList").innerHTML = !d.read ? '<div class="empty">Bağlandıktan sonra kodlar otomatik okunur. İstediğiniz zaman tekrar okuyabilirsiniz.</div>' : !all.length ? '<div class="empty">Kayıtlı veya bekleyen arıza kodu yok.</div>' : all.map(([c, type]) => {
+    const i = dtcInfo(c);
+    const sev = type === "Bekleyen" ? "warn" : "crit";
+    return '<article class="find '.concat(sev, '"><div class="fh"><span class="code" style="font:700 22px var(--f-num);letter-spacing:.04em">').concat(c, '</span><span class="chip ').concat(sev, '">').concat(type, "</span><b>").concat(esc(i.d), '</b></div>\n        <div class="cols"><div><h4>Olası nedenler</h4><ul><li>').concat(esc(i.c), "</li></ul></div><div><h4>Ne yapmalı</h4><ul><li>").concat(esc(i.a), "</li>").concat(type === "Bekleyen" ? "<li>Bekleyen kod: arıza bir kez görüldü, tekrarlanırsa lamba yanar</li>" : "", "</ul></div></div></article>");
+  }).join("");
+}
+$("btnReadDtc").addEventListener("click", async () => {
+  await readDtc();
+  renderReady();
+  renderFreeze();
+});
+$("btnClearAsk").addEventListener("click", () => {
+  if (S.mode === "off") {
+    showMsg("Önce adaptöre bağlanın veya demoyu açın.");
+    return;
+  }
+  $("clearBox").hidden = false;
+});
+$("btnClearNo").addEventListener("click", () => $("clearBox").hidden = true);
+$("btnClearYes").addEventListener("click", clearDtc);
+let liveKeys = [];
+function buildLive() {
+  const keys = [...PIDS.filter((p) => S.sup.has(p.pid)).map((p) => p.k), ...EXTRA.map((e) => e.k)].filter((k) => S.hist[k] && S.hist[k].length);
+  liveKeys = keys;
+  $("liveInfo").textContent = keys.length ? keys.length + " değer, son 2 dakika" : "Bağlanınca aracın desteklediği değerler burada görünür.";
+  $("liveGrid").innerHTML = keys.map((k) => {
+    const d = PBYK[k] || EXTRA.find((e) => e.k === k);
+    return '<div class="card"><div class="lbl"><span>'.concat(d.name, '</span></div><div class="val" id="lv-').concat(k, '">--</div><canvas id="lc-').concat(k, '"></canvas></div>');
+  }).join("") || '<div class="empty">Veri yok.</div>';
+  updateLive();
+}
+function updateLive() {
+  if ($("v-canli").hidden) return;
+  const cur = [...PIDS.filter((p) => S.sup.has(p.pid)).map((p) => p.k), ...EXTRA.map((e) => e.k)].filter((k) => S.hist[k] && S.hist[k].length);
+  if (cur.length !== liveKeys.length) {
+    buildLive();
+    return;
+  }
+  for (const k of liveKeys) {
+    const d = PBYK[k] || EXTRA.find((e) => e.k === k);
+    const el = $("lv-" + k);
+    if (!el) continue;
+    el.innerHTML = fmt(S.v[k], d.d) + "<small>".concat(d.u, "</small>");
+    spark($("lc-" + k), S.hist[k], css("--accent"));
+  }
+}
+function bindSettings() {
+  const map = { sFuel: "fuel", sDisp: "disp", sTurbo: "turbo", sBoost: "boost", sPrice: "price", sLimit: "limit", sNight: "autoNight" };
+  for (const [id, k] of Object.entries(map)) {
+    const el = $(id);
+    el.value = SET[k];
+    el.addEventListener("change", () => {
+      if (id === "sNight") {
+        SET.autoNight = el.value;
+        saveSet();
+        autoNightTick();
+        return;
+      }
+      if (id === "sPrice" || id === "sLimit") {
+        SET[k] = parseFloat(String(el.value).replace(",", ".")) || 0;
+        saveSet();
+        return;
+      }
+      const num = el.type === "number" || id === "sTurbo";
+      SET[k] = num ? parseFloat(el.value) || 0 : el.value;
+      saveSet();
+      $("sBoost").disabled = !SET.turbo;
+      if (S.mode === "demo") startDemo();
+    });
+  }
+  $("sBoost").disabled = !SET.turbo;
+  const sl = SET.slots && SET.slots.length === 4 ? SET.slots : DEF_SLOTS.slice();
+  $("slotForm").innerHTML = sl.map((k, i) => '<div class="field"><label for="slot'.concat(i, '">Alan ').concat(i + 1, '</label><select id="slot').concat(i, '">').concat(Object.entries(SLOT_DEFS).map(([kk, d]) => '<option value="'.concat(kk, '" ').concat(kk === k ? "selected" : "", ">").concat(d.name, "</option>")).join(""), "</select></div>")).join("");
+  sl.forEach((_, i) => $("slot" + i).addEventListener("change", () => {
+    SET.slots = [0, 1, 2, 3].map((j) => $("slot" + j).value);
+    saveSet();
+  }));
+  $("mOdo").addEventListener("change", (e) => {
+    const v = parseFloat(e.target.value);
+    if (v > 0) {
+      SET.odo = v - LEARN.km;
+      saveSet();
+      renderMnt();
+      mntDiag();
+      renderDiag(true);
+    }
+  });
+  document.querySelectorAll("[data-perf]").forEach((b) => b.addEventListener("click", () => perfStart(b.dataset.perf)));
+  $("btnGps").addEventListener("click", gpsToggle);
+  $("btnTripCsv").addEventListener("click", () => shareText(tripsCsv(), "yolculuklar.csv", "tripMsg"));
+  $("btnRec").addEventListener("click", () => {
+    REC.on = !REC.on;
+    if (REC.on) REC.rows = [];
+    $("btnRec").textContent = REC.on ? "Kaydı durdur" : "Kaydı başlat";
+  });
+  $("btnRecCsv").addEventListener("click", () => {
+    if (!REC.rows.length) {
+      $("recMsg").textContent = "Önce kayıt alın";
+      return;
+    }
+    shareText(recCsv(), "surus_kaydi.csv", "recMsg");
+  });
+  $("sVoice").checked = !!SET.voice;
+  $("sVoice").addEventListener("change", (e) => {
+    SET.voice = e.target.checked;
+    saveSet();
+    if (SET.voice) speak("Sesli uyarılar açık");
+  });
+  $("demoFlags").innerHTML = DEMO_FLAGS.map((f) => '<label class="check"><input type="checkbox" id="df-'.concat(f.k, '" ').concat(f.on ? "checked" : "", "> ").concat(f.name, "</label>")).join("");
+  DEMO_FLAGS.forEach((f) => $("df-" + f.k).addEventListener("change", (e) => {
+    f.on = e.target.checked;
+    if (S.mode === "demo") startDemo();
+  }));
+  $("btnReset").addEventListener("click", () => {
+    const m = $("resetMsg");
+    if (m.dataset.arm !== "1") {
+      m.textContent = "Emin misiniz? Tekrar dokunun";
+      m.hidden = false;
+      m.dataset.arm = "1";
+      setTimeout(() => {
+        m.dataset.arm = "";
+        m.hidden = true;
+      }, 4e3);
+      return;
+    }
+    REAL_LEARN = structuredClone(DEF_LEARN);
+    if (S.mode !== "demo") LEARN = REAL_LEARN;
+    store("mgmk.learn", REAL_LEARN);
+    m.textContent = "Sıfırlandı";
+    m.dataset.arm = "";
+    renderDiag(true);
+  });
+}
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+let wake = null;
+async function requestWake() {
+  try {
+    if ("wakeLock" in navigator) wake = await navigator.wakeLock.request("screen");
+  } catch (e) {
+  }
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && (S.mode === "on" || S.mode === "demo")) requestWake();
+});
+$("btnConnect").addEventListener("click", () => {
+  if (S.mode === "on") {
+    Elm.disconnect();
+    endTrip();
+    setMode("off", "Bağlı değil");
+  } else connectReal();
+});
+$("btnDemo").addEventListener("click", () => {
+  if (S.mode === "demo") {
+    stopDemo();
+    S.v = {};
+    F.clear();
+    setMode("off", "Bağlı değil");
+    renderDiag(true);
+  } else {
+    startDemo();
+    requestWake();
+  }
+});
+setInterval(() => {
+  renderCockpit();
+  updateLive();
+}, 500);
+let offSec = 0, nightTick = 0;
+setInterval(() => {
+  var _a;
+  if (S.mode === "on" || S.mode === "demo") {
+    drvTick();
+    recTick();
+    const rpm = (_a = V("rpm")) != null ? _a : 0;
+    offSec = rpm < 50 ? offSec + 1 : 0;
+    if (offSec === 120 && S.trip.sec > 60) {
+      endTrip();
+      resetTrip();
+      log("Yolculuk kaydedildi");
+    }
+  }
+  if (++nightTick % 60 === 1) autoNightTick();
+  if (!$("v-yolculuk").hidden && nightTick % 3 === 0) renderTrips();
+  if (!$("v-perf").hidden) {
+    if (PF.mode) renderPerf();
+    if (GPS.id != null) renderGps();
+  }
+  const nm = mntList().filter((d) => ["warn", "crit"].includes(mntState(d).sev)).length, el = $("nMnt");
+  el.hidden = !nm;
+  el.textContent = nm;
+}, 1e3);
+bindSettings();
+buildThemeBar();
+$("clusterWrap").addEventListener("click", () => {
+  if (document.body.classList.contains("focus")) exitFocus();
+});
+document.addEventListener("fullscreenchange", () => {
+  if (!document.fullscreenElement && document.body.classList.contains("focus")) exitFocus();
+});
+let startTab = "kokpit";
+try {
+  startTab = localStorage.getItem("mgmk.tab") || "kokpit";
+} catch (e) {
+}
+showView(VIEWS.includes(startTab) ? startTab : "kokpit");
+setTheme(THEME, false);
+resizeDial();
+requestAnimationFrame(frame);
+(async () => {
+  let framed = true;
+  try {
+    framed = window.self !== window.top;
+  } catch (e) {
+  }
+  framedView = framed;
+  let bt = !!navigator.bluetooth && !framed || !!window.MGMNative;
+  if (bt && !window.MGMNative && navigator.bluetooth.getAvailability) {
+    try {
+      bt = await navigator.bluetooth.getAvailability();
+    } catch (e) {
+      bt = false;
+    }
+  }
+  if (!bt) {
+    showBtNote(false);
+    startDemo();
+  } else {
+    renderDiag(true);
+    renderDtc();
+    log("Hazır. 'ELM327'ye bağlan' ile adaptörü seçin.");
+  }
+})();
+</script>
+
+</body>
+</html>
