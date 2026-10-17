@@ -512,6 +512,30 @@ function log(s) {
   }
 }
 const ELM_SVCS = [65520, 65504, 6384, 65248, 65440, "e7810a71-73ae-499d-8c15-faa9aef0c3f2", "6e400001-b5a3-f393-e0a9-e50e24dcca9e", "0000ae30-0000-1000-8000-00805f9b34fb"];
+const ELM_NAMES = ["OBD", "OBDII", "OBD2", "V-LINK", "VLINK", "Vgate", "vLink", "IOS", "ELM", "Viecar", "VEEPEAK", "KONNWEI", "KW", "Carista", "CAR", "BLE", "iCar", "Android-Vlink"];
+const fullUuid = (u) => typeof u === "number" ? "0000" + u.toString(16).padStart(4, "0") + "-0000-1000-8000-00805f9b34fb" : u;
+const btErr = (e) => e && (e.name || "Hata") + (e.message ? ": " + e.message : "") || String(e);
+async function pickDevice() {
+  const svcs128 = ELM_SVCS.map(fullUuid);
+  const tries = [
+    ["tüm cihazlar", { acceptAllDevices: true, optionalServices: ELM_SVCS }],
+    ["tüm cihazlar (uzun UUID)", { acceptAllDevices: true, optionalServices: svcs128 }],
+    ["isme göre", { filters: ELM_NAMES.map((n) => ({ namePrefix: n })), optionalServices: svcs128 }],
+    ["servise göre", { filters: svcs128.map((u) => ({ services: [u] })), optionalServices: svcs128 }]
+  ];
+  let last = null;
+  for (const [name, opt] of tries) {
+    try {
+      return await navigator.bluetooth.requestDevice(opt);
+    } catch (e) {
+      last = e;
+      log("Cihaz seçimi (" + name + ") olmadı: " + btErr(e));
+      if (e && e.name === "NotFoundError" && /cancel|iptal|chooser|User/i.test(e.message || "")) throw e;
+      if (e && e.name === "SecurityError" && /gesture/i.test(e.message || "")) throw e;
+    }
+  }
+  throw last || new Error("Bluetooth cihaz seçimi açılamadı");
+}
 const Elm = {
   dev: null,
   rx: null,
@@ -521,14 +545,26 @@ const Elm = {
   q: Promise.resolve(),
   nr: false,
   async connect() {
-    this.dev = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: ELM_SVCS });
+    this.dev = await pickDevice();
     log("Seçilen cihaz: " + (this.dev.name || "adsız"));
     this.dev.addEventListener("gattserverdisconnected", () => {
       log("Bağlantı koptu");
       onLinkLost();
     });
     const srv = await this.dev.gatt.connect();
-    const svcs = await srv.getPrimaryServices();
+    let svcs = [];
+    try {
+      svcs = await srv.getPrimaryServices();
+    } catch (e) {
+      log("Servis listesi alınamadı: " + btErr(e));
+    }
+    if (!svcs.length) for (const u of ELM_SVCS.map(fullUuid)) {
+      try {
+        svcs.push(await srv.getPrimaryService(u));
+      } catch (e) {
+      }
+    }
+    log("Bulunan servis: " + svcs.map((x) => x.uuid.slice(4, 8)).join(", "));
     for (const s of svcs) {
       let chars = [];
       try {
@@ -726,7 +762,7 @@ async function connectReal() {
   } catch (e) {
     log("Hata: " + e.message);
     setMode("off", "Bağlı değil");
-    showMsg(e.name === "NotFoundError" ? "Cihaz seçilmedi." : e.message);
+    showMsg(e && e.name === "NotFoundError" && !/supported|desteklen/i.test(e.message || "") ? "Cihaz seçilmedi veya bulunamadı. Adaptör takılı ve kontak açık mı?" : "Bağlanılamadı: " + btErr(e) + ". Bluetooth açık mı, Bluefy'ye Bluetooth izni verildi mi? Ayrıntı: Araç ve ayarlar › Bağlantı günlüğü.");
   }
 }
 function onLinkLost() {
@@ -1656,14 +1692,14 @@ function showMsg(t) {
   const n = $("btNote");
   n.innerHTML = "";
   const s = document.createElement("span");
-  s.textContent = t;
+  s.textContent = t || "Bilinmeyen hata";
   n.appendChild(s);
   n.hidden = false;
   clearTimeout(msgTimer);
   msgTimer = setTimeout(() => {
     if (!btUnsupported) n.hidden = true;
     else showBtNote(false);
-  }, 5e3);
+  }, 9e3);
 }
 let btUnsupported = false;
 let framedView = false;
